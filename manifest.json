@@ -1,0 +1,9 @@
+{
+	"id": "acta-task",
+	"name": "Acta Task",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "A task board view in the sidebar that auto-detects checkboxes from tagged notes and groups them by topic.",
+	"author": "lilyzhang",
+	"isDesktopOnly": false
+}
