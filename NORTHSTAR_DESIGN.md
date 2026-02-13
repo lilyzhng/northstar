@@ -34,11 +34,16 @@ The system collects raw signals from your vault. No judgment yet, just gathering
 
 | Signal source | What it reads |
 |---------------|---------------|
-| Task board | Tasks created, completed, abandoned, overdue |
+| Task board | Tasks created, completed, abandoned, overdue. Parses time annotations (e.g., `@9-10AM`) to extract duration and classifies effort level (`deep_work` vs `quick_action`). |
 | Positive feedback board | What you said went well |
 | Negative feedback board | What you said needs improvement |
 | Daily notes / reflections | Free-form writing tagged `#northstar` or in your daily note |
 | Vault activity | Which files and folders you worked in |
+
+**Time annotation convention:** When completing a task, you can add `@[start]-[end]` to log time spent (e.g., `@9-10AM`, `@2-5PM`). This is just typed text — no plugin needed. The system parses these to calculate duration and classify effort:
+
+- Has `@` time annotation → `deep_work` (duration extracted from the range)
+- No annotation → `quick_action` (bookmarks, data entries, short logs — excluded from alignment scoring)
 
 ### 2. ASSESS — How aligned was today?
 
@@ -81,6 +86,170 @@ This is the self-evolvement. The system proposes changes to its own policy. The 
 > Example: "Research competitor landscape" → completed → evolved into "Define differentiators based on research findings"
 
 **Confidence threshold:** High-confidence changes (like transitioning phases when milestones are done) are auto-applied and logged. Low-confidence changes are queued for your review. You always have final say.
+
+### Call Architecture
+
+The four steps map to **separate LLM calls**, not one monolithic prompt. Each step requires a different cognitive frame, and bundling them degrades the later steps.
+
+```
+Day 1-2:   OBSERVE → ASSESS → ADAPT           (2 LLM calls)
+Day 3+:    OBSERVE → ASSESS → REFLECT → ADAPT  (3 LLM calls)
+```
+
+| Call | Step | Model | Why isolated |
+|------|------|-------|-------------|
+| 0 | OBSERVE | Fast/cheap (or rule-based) | Extraction, not reasoning. Pulls structured signals from raw vault content. No judgment. |
+| 1 | ASSESS | Capable model | Evaluation — scores today against the policy. Single-day scope. Always runs. |
+| 2 | REFLECT | Capable model | Pattern recognition across multiple days. Different cognitive frame than scoring. **Only runs when history >= 3 days** — below that, there are no patterns to find. |
+| 3 | ADAPT | Capable model | Decision-making — proposes policy mutations. Isolated so the model focuses entirely on "what should change?" rather than treating it as an afterthought of analysis. |
+
+**Why ASSESS and REFLECT are separate calls:**
+
+- **Different time scope.** ASSESS looks at today. REFLECT looks at the last N days. When combined, the model's recency bias from scoring today bleeds into trajectory analysis — one bad day after six great days gets overstated as "decelerating" when the real trend is "steady with a dip."
+- **Different readiness curves.** ASSESS is useful from Day 1. REFLECT is useless until Day 3 and becomes the most valuable step by Day 20. Separating them means we skip REFLECT when it would just produce filler ("Establishing baseline. Insufficient data.").
+- **Frame reset.** Separation forces the model to reset its frame between "here's how today went" and "forget today's emotions, what does the 7-day picture actually look like?"
+
+**Why ADAPT is its own call:**
+
+- ADAPT is a decision step, not an analysis step. When it trails a long analytical prompt, the model treats policy proposals as summaries rather than deliberate choices.
+- Isolating it makes policy changes auditable — the input and output of the ADAPT call are a clean record of "given this assessment and trajectory, here's what I propose to change and why."
+- ADAPT can be skipped entirely on low-change days (stable trajectory, no new signals) to save cost.
+
+---
+
+### Example: A Full Cycle (Feb 13, 2026)
+
+**Locked goal:** "Land a Post-Training Research Engineer role within 45 days"
+**Day:** 1 of 45 · Phase: Exploration
+
+#### Call 0: OBSERVE
+
+The system scans the daily note and boards. No LLM reasoning — just extraction into structured signals.
+
+```json
+{
+  "date": "2026-02-13",
+  "tasks": {
+    "completed": [
+      {
+        "title": "Runway interview — agentic video editing 1-pager",
+        "tags": ["interview"],
+        "time": "@11AM-1PM",
+        "duration_min": 120,
+        "effort": "deep_work"
+      }
+    ],
+    "incomplete": [
+      { "title": "Review Skydio onsite requirements", "tags": ["interview"] },
+      { "title": "Choose hackathon project with Zara", "tags": ["hackathon"] },
+      { "title": "Read core post-training paper (InstructGPT/DPO)", "tags": ["paper"] }
+    ]
+  },
+  "positive_feedback": [
+    { "entry": "Got a good profile photo", "tags": ["brand"], "effort": "quick_action" }
+  ],
+  "negative_feedback": [
+    { "entry": "Work is annoying, considering negative reinforcement to motivate job search", "tags": ["work"] }
+  ],
+  "other_signals": [
+    { "entry": "Master plan created for Post-Training RE role", "time": "@9-11AM", "duration_min": 120, "effort": "deep_work" },
+    { "entry": "Uber interview confirmed Feb 24", "effort": "quick_action" },
+    { "entry": "Spotted Anthropic Research Engineer posting", "effort": "quick_action" },
+    { "entry": "Microsoft referral from Yan", "effort": "quick_action" }
+  ]
+}
+```
+
+#### Call 1: ASSESS
+
+**Input:** Goal + today's signals + measurement policy
+
+**Output:**
+
+> **Alignment score: 52/100**
+>
+> **Time breakdown:** 4h of deep work tracked today.
+> - 2h on master plan (@9-11AM) — goal-aligned
+> - 2h on Runway interview prep (@11AM-1PM) — not goal-aligned
+> - Quick actions (Uber confirmation, job postings, profile photo) — no meaningful time cost, excluded from alignment scoring
+>
+> **Signal breakdown:**
+> - Goal-direct deep work (weight 0.30): 2h on master plan is strong strategic work. But only 50% of your deep work hours went to the goal. The post-training paper reading didn't happen — that's on the critical path. **15/30**
+> - Task completion (weight 0.15): 1/4 completed. The completed task (Runway, 2h) is not a post-training role. **4/15**
+> - Reflection depth (weight 0.25): Negative feedback shows emotional awareness of urgency. But no explicit reflection on post-training prep progress. **14/25**
+> - Pipeline activity (weight 0.20): Strong — Uber confirmed, Anthropic posting spotted, Microsoft referral. These are quick actions, not time sinks. **16/20**
+> - Feedback signals (weight 0.10): Profile photo is brand but not goal-critical. Work frustration is motivational, not alignment-related. **3/10**
+>
+> **Drift indicator:** "You had 4 hours of deep work today. Half went to Runway — a creative-AI role, not post-training. The paper reading that would directly build post-training depth got zero hours."
+>
+> **Momentum indicator:** "The 2h master plan is a strong foundation move. Pipeline bookmarks (Uber, Anthropic, Microsoft) are quick actions that cost you nothing — those aren't the problem."
+
+#### Call 2: REFLECT
+
+**Skipped.** Day 1 — no historical assessments to analyze. REFLECT activates on Day 3.
+
+#### Call 3: ADAPT
+
+**Input:** Today's assessment (no reflection data yet)
+
+**Output:**
+
+> **Proposed changes:**
+>
+> 1. **Add milestone** (confidence: HIGH → auto-apply):
+>    - "Read and annotate 3 core post-training papers (InstructGPT, DPO, GRPO)" — deadline Feb 20
+>    - *Reason: Paper reading is on today's task list but wasn't completed. Foundational for the goal.*
+>
+> 2. **Add milestone** (confidence: HIGH → auto-apply):
+>    - "Complete Uber interview prep" — deadline Feb 23
+>    - *Reason: Confirmed interview on Feb 24.*
+>
+> 3. **New signal proposed** (confidence: LOW → queued for review):
+>    - "interview-goal-fit" — scores whether interview prep time targets post-training-aligned roles vs. unrelated ones
+>    - *Reason: Today shows effort going to Runway (creative AI, not post-training). Current policy doesn't distinguish between goal-aligned and goal-adjacent interviews.*
+>
+> 4. **Tomorrow's check-in prompt** (confidence: HIGH → auto-apply):
+>    - "You skipped the post-training paper yesterday. What got in the way, and will you read it today?"
+
+#### What the user sees
+
+```
+╔══════════════════════════════════════════════════╗
+║  ⭐ Land a Post-Training Research Engineer role  ║
+║     Day 1 of 45  ·  Phase: Exploration           ║
+╠══════════════════════════════════════════════════╣
+║  Today's Alignment: 52/100                       ║
+║  Trend: — (baseline, tracking starts Day 3)      ║
+║                                                  ║
+║  ⚡ Pipeline active (3 opportunities)            ║
+║  ⚠️  Paper reading skipped — critical path item   ║
+║  ⚠️  Runway prep may be diluting focus            ║
+║                                                  ║
+║  📋 Pending review: New signal "interview fit"   ║
+╚══════════════════════════════════════════════════╝
+```
+
+#### Tinker conversation (same evening)
+
+You see the 52/100 and the drift warning. You open the Tinker chat. It already has full context — your goal, today's assessment, and the signals.
+
+> **Tinker:** Your alignment is at 52 today. I want to zoom out for a second. Looking at your plate right now: Runway interview, Skydio prep, Uber prep, hackathon with Zara, a meetup, networking, job postings from Microsoft — and the actual goal is post-training RE. How many of these are directly building toward that?
+>
+> **You:** Honestly, Skydio and Uber are practice interviews. Runway was more of an obligation.
+>
+> **Tinker:** So out of everything you worked on today, the only thing that directly advances the post-training goal is the master plan you created. The core paper reading — InstructGPT, DPO — didn't happen. That's the kind of work that compounds. Practice interviews don't build post-training depth. Are you comfortable with that trade-off today, or is this becoming a pattern?
+>
+> **You:** It's just today. I'll read the DPO paper tomorrow.
+>
+> **Tinker:** I'll hold you to that. One more thing — the hackathon project with Zara. You haven't chosen an approach yet. If you pick the Eval Agent, that's a project you could directly reference in a post-training interview: "I built an eval agent that does X." The other options are interesting but they don't help the goal. When you're already spread across Skydio, Uber, Runway, and networking — the hackathon might be your one chance this month to build something that actually demonstrates post-training skill. Don't waste it on something generic.
+
+**What happens next:** This conversation feeds back into the loop. Tomorrow's OBSERVE picks up two signals from this chat:
+1. You committed to reading the DPO paper tomorrow.
+2. The Tinker flagged that practice interviews and networking are consuming time without building post-training depth.
+
+Tomorrow's ASSESS will check whether the paper reading happened. If it didn't two days in a row, the drift warning escalates.
+
+---
 
 ## Phases
 
@@ -176,8 +345,10 @@ The conversation is persistent within a goal window. You can scroll back through
 
 ## Open Questions
 
-1. **LLM cost**: Each cycle involves LLM calls. Should we batch into one call or separate calls for assess/reflect/adapt?
-2. **Offline fallback**: What if the LLM is unreachable? Skip and retry, or fall back to a simpler mode?
-3. **Multiple goals**: One north star at a time (enforced focus), or parallel goals?
+1. ~~**LLM cost**: Each cycle involves LLM calls. Should we batch into one call or separate calls for assess/reflect/adapt?~~ **Resolved** — separate calls. OBSERVE is extraction (cheap/rule-based). ASSESS and REFLECT are separate calls because they require different cognitive frames and REFLECT only activates after 3+ days of history. ADAPT is isolated as a decision step. See *Call Architecture* above.
+2. ~~**Offline fallback**: What if the LLM is unreachable? Skip and retry, or fall back to a simpler mode?~~ **Resolved** —  
+          +do nothing. Skip the cycle and retry next time the LLM is available. No degraded mode.
+3. ~~**Multiple goals**: One north star at a time (enforced focus), or parallel goals?~~ **Resolved** — one goal at a time.  
+          +Enforced focus.    
 4. **Cross-goal learning**: When a goal is archived, should the system carry forward what it learned about your work patterns to seed the next goal's policy?
 5. **Privacy**: The system reads your vault. Should there be an include/exclude list for which folders are scanned?
