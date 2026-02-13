@@ -22,7 +22,7 @@ __export(main_exports, {
   default: () => ActaTaskPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian9 = require("obsidian");
+var import_obsidian12 = require("obsidian");
 
 // src/types.ts
 var DEFAULT_SETTINGS = {
@@ -31,7 +31,9 @@ var DEFAULT_SETTINGS = {
   showCompleted: true,
   showSourceNote: true,
   topicSortOrder: "alphabetical",
-  taskSortOrder: "incompleteFirst"
+  taskSortOrder: "incompleteFirst",
+  anthropicApiKey: "",
+  northStarModel: "claude-sonnet-4-20250514"
 };
 var DEFAULT_DATA = {
   addedTasks: {}
@@ -47,6 +49,7 @@ var DEFAULT_NEGATIVE_FEEDBACK_DATA = {
 };
 var ACTA_NEGATIVE_FEEDBACK_VIEW_TYPE = "acta-negative-feedback-board";
 var NEGATIVE_FEEDBACK_TRIGGER_TAGS = ["#\u{1F612}"];
+var ACTA_NORTHSTAR_VIEW_TYPE = "acta-northstar-board";
 
 // src/taskBoardView.ts
 var import_obsidian = require("obsidian");
@@ -574,9 +577,395 @@ var NegativeFeedbackBoardView = class extends import_obsidian3.ItemView {
   }
 };
 
-// src/settings.ts
+// src/northStarBoardView.ts
+var import_obsidian5 = require("obsidian");
+
+// src/northStarGoalModal.ts
 var import_obsidian4 = require("obsidian");
-var ActaTaskSettingTab = class extends import_obsidian4.PluginSettingTab {
+var NorthStarGoalModal = class extends import_obsidian4.Modal {
+  constructor(app, onSubmit) {
+    super(app);
+    this.goalText = "";
+    this.timeWindowDays = 30;
+    this.onSubmit = onSubmit;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl("h3", { text: "Set Your North Star" });
+    contentEl.createEl("p", {
+      text: "Define your goal and lock it in. The goal cannot be changed \u2014 only archived and replaced.",
+      cls: "setting-item-description"
+    });
+    new import_obsidian4.Setting(contentEl).setName("Goal").setDesc("What are you working toward?").addTextArea(
+      (text) => text.setPlaceholder("e.g., Land a Post-Training Research Engineer role").onChange((value) => {
+        this.goalText = value;
+      })
+    );
+    new import_obsidian4.Setting(contentEl).setName("Time window (days)").setDesc("How many days to reach this goal?").addText(
+      (text) => text.setPlaceholder("30").setValue("30").onChange((value) => {
+        const num = parseInt(value, 10);
+        if (!isNaN(num) && num > 0) {
+          this.timeWindowDays = num;
+        }
+      })
+    );
+    new import_obsidian4.Setting(contentEl).addButton(
+      (btn) => btn.setButtonText("Lock It In").setCta().onClick(() => {
+        if (this.goalText.trim().length === 0)
+          return;
+        this.onSubmit(this.goalText.trim(), this.timeWindowDays);
+        this.close();
+      })
+    );
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
+
+// src/northStarBoardView.ts
+var NorthStarBoardView = class extends import_obsidian5.ItemView {
+  constructor(leaf, manager, agent, settings) {
+    super(leaf);
+    this.boardEl = null;
+    this.isRunning = false;
+    this.manager = manager;
+    this.agent = agent;
+    this.settings = settings;
+  }
+  getViewType() {
+    return ACTA_NORTHSTAR_VIEW_TYPE;
+  }
+  getDisplayText() {
+    return "North Star";
+  }
+  getIcon() {
+    return "star";
+  }
+  async onOpen() {
+    const container = this.containerEl.children[1];
+    container.empty();
+    container.addClass("acta-task-container");
+    this.boardEl = container.createDiv({ cls: "acta-northstar-board" });
+    this.renderBoard();
+  }
+  async onClose() {
+  }
+  updateSettings(settings) {
+    this.settings = settings;
+  }
+  refresh() {
+    if (!this.isRunning) {
+      this.renderBoard();
+    }
+  }
+  renderBoard() {
+    if (!this.boardEl)
+      return;
+    this.boardEl.empty();
+    const goal = this.manager.getGoal();
+    this.renderHeader();
+    if (!goal) {
+      this.renderEmptyGoalState();
+      return;
+    }
+    this.renderGoalCard();
+    const latest = this.manager.getLatestAssessment();
+    if (!latest) {
+      this.renderNoAssessmentState();
+      return;
+    }
+    this.renderScoreDisplay(latest);
+    this.renderSignalBreakdown(latest);
+    this.renderDriftIndicators(latest);
+    this.renderMomentumIndicators(latest);
+  }
+  renderHeader() {
+    if (!this.boardEl)
+      return;
+    const header = this.boardEl.createDiv({ cls: "acta-northstar-header" });
+    const titleRow = header.createDiv({ cls: "acta-northstar-title-row" });
+    titleRow.createEl("h4", { text: "North Star" });
+    const btnGroup = titleRow.createDiv({ cls: "acta-northstar-btn-group" });
+    const goal = this.manager.getGoal();
+    if (goal) {
+      const runBtn = btnGroup.createEl("button", {
+        cls: "acta-northstar-run-btn clickable-icon",
+        attr: { "aria-label": "Run Cycle" }
+      });
+      runBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+      runBtn.addEventListener("click", () => this.runCycle());
+    }
+    const refreshBtn = btnGroup.createEl("button", {
+      cls: "acta-northstar-refresh-btn clickable-icon",
+      attr: { "aria-label": "Refresh" }
+    });
+    refreshBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`;
+    refreshBtn.addEventListener("click", () => this.refresh());
+  }
+  renderEmptyGoalState() {
+    if (!this.boardEl)
+      return;
+    const empty = this.boardEl.createDiv({ cls: "acta-northstar-empty" });
+    empty.createEl("p", { text: "No goal set yet." });
+    const setBtn = empty.createEl("button", {
+      cls: "acta-northstar-set-goal-btn",
+      text: "Set Your North Star"
+    });
+    setBtn.addEventListener("click", () => this.openGoalModal());
+  }
+  renderNoAssessmentState() {
+    if (!this.boardEl)
+      return;
+    const empty = this.boardEl.createDiv({ cls: "acta-northstar-no-assessment" });
+    empty.createEl("p", { text: "No assessment yet. Click the play button to run your first cycle." });
+    if (!this.settings.anthropicApiKey) {
+      empty.createEl("p", {
+        text: "Set your Anthropic API key in Settings \u2192 Acta Task \u2192 North Star first.",
+        cls: "acta-northstar-warning"
+      });
+    }
+  }
+  renderGoalCard() {
+    if (!this.boardEl)
+      return;
+    const goal = this.manager.getGoal();
+    if (!goal)
+      return;
+    const card = this.boardEl.createDiv({ cls: "acta-northstar-goal-card" });
+    const goalText = card.createDiv({ cls: "acta-northstar-goal-text" });
+    goalText.createEl("span", { text: goal.text });
+    const badges = card.createDiv({ cls: "acta-northstar-goal-badges" });
+    const dayNum = this.manager.getDayNumber();
+    badges.createEl("span", {
+      cls: "acta-northstar-badge",
+      text: `Day ${dayNum} of ${goal.timeWindowDays}`
+    });
+    badges.createEl("span", {
+      cls: "acta-northstar-badge acta-northstar-badge-phase",
+      text: goal.currentPhase
+    });
+    const daysLeft = this.manager.getDaysLeft();
+    badges.createEl("span", {
+      cls: `acta-northstar-badge ${daysLeft <= 7 ? "acta-northstar-badge-urgent" : ""}`,
+      text: `${daysLeft}d left`
+    });
+  }
+  renderScoreDisplay(assessment) {
+    if (!this.boardEl)
+      return;
+    const scoreSection = this.boardEl.createDiv({ cls: "acta-northstar-score-section" });
+    const scoreEl = scoreSection.createDiv({ cls: "acta-northstar-score" });
+    const scoreNum = scoreEl.createEl("span", {
+      cls: "acta-northstar-score-number",
+      text: `${assessment.overallScore}`
+    });
+    if (assessment.overallScore >= 70) {
+      scoreNum.addClass("acta-northstar-score-good");
+    } else if (assessment.overallScore >= 40) {
+      scoreNum.addClass("acta-northstar-score-mid");
+    } else {
+      scoreNum.addClass("acta-northstar-score-low");
+    }
+    scoreEl.createEl("span", {
+      cls: "acta-northstar-score-label",
+      text: "/100"
+    });
+    scoreSection.createDiv({
+      cls: "acta-northstar-score-date",
+      text: `Day ${assessment.dayNumber} \u2014 ${assessment.date}`
+    });
+  }
+  renderSignalBreakdown(assessment) {
+    if (!this.boardEl)
+      return;
+    const section = this.boardEl.createDiv({ cls: "acta-northstar-breakdown" });
+    section.createEl("h5", { text: "Signal Breakdown" });
+    for (const signal of assessment.signalBreakdown) {
+      this.renderSignalBar(section, signal);
+    }
+  }
+  renderSignalBar(parent, signal) {
+    const row = parent.createDiv({ cls: "acta-northstar-signal-row" });
+    const labelRow = row.createDiv({ cls: "acta-northstar-signal-label-row" });
+    labelRow.createEl("span", {
+      cls: "acta-northstar-signal-name",
+      text: this.formatCategoryName(signal.category)
+    });
+    labelRow.createEl("span", {
+      cls: "acta-northstar-signal-score",
+      text: `${Math.round(signal.score)}/${Math.round(signal.maxScore)}`
+    });
+    const barContainer = row.createDiv({ cls: "acta-northstar-bar-container" });
+    const bar = barContainer.createDiv({ cls: "acta-northstar-bar" });
+    const pct = signal.maxScore > 0 ? signal.score / signal.maxScore * 100 : 0;
+    bar.style.width = `${Math.min(100, Math.max(0, pct))}%`;
+    if (pct >= 70)
+      bar.addClass("acta-northstar-bar-good");
+    else if (pct >= 40)
+      bar.addClass("acta-northstar-bar-mid");
+    else
+      bar.addClass("acta-northstar-bar-low");
+    if (signal.reasoning) {
+      row.createDiv({
+        cls: "acta-northstar-signal-reasoning",
+        text: signal.reasoning
+      });
+    }
+  }
+  renderDriftIndicators(assessment) {
+    if (!this.boardEl || assessment.driftIndicators.length === 0)
+      return;
+    const section = this.boardEl.createDiv({ cls: "acta-northstar-drift" });
+    section.createEl("h5", { text: "Drift Indicators" });
+    for (const drift of assessment.driftIndicators) {
+      section.createDiv({
+        cls: "acta-northstar-drift-item",
+        text: drift
+      });
+    }
+  }
+  renderMomentumIndicators(assessment) {
+    if (!this.boardEl || assessment.momentumIndicators.length === 0)
+      return;
+    const section = this.boardEl.createDiv({ cls: "acta-northstar-momentum" });
+    section.createEl("h5", { text: "Momentum Indicators" });
+    for (const momentum of assessment.momentumIndicators) {
+      section.createDiv({
+        cls: "acta-northstar-momentum-item",
+        text: momentum
+      });
+    }
+  }
+  formatCategoryName(category) {
+    const names = {
+      goalDirectDeepWork: "Goal-Direct Deep Work",
+      taskCompletion: "Task Completion",
+      reflectionDepth: "Reflection Depth",
+      pipelineActivity: "Pipeline Activity",
+      feedbackSignals: "Feedback Signals"
+    };
+    return names[category] || category;
+  }
+  openGoalModal() {
+    new NorthStarGoalModal(this.app, async (text, days) => {
+      await this.manager.setGoal(text, days);
+      new import_obsidian5.Notice("North Star goal locked in!");
+      this.renderBoard();
+    }).open();
+  }
+  // ── Live activity log for the cycle ──
+  async runCycle() {
+    if (this.isRunning)
+      return;
+    if (!this.settings.anthropicApiKey) {
+      new import_obsidian5.Notice("Set your Anthropic API key in Settings \u2192 Acta Task first.");
+      return;
+    }
+    this.isRunning = true;
+    const steps = [
+      { id: "tasks", label: "Task board", status: "pending", detail: "" },
+      { id: "positive-feedback", label: "Positive feedback", status: "pending", detail: "" },
+      { id: "negative-feedback", label: "Negative feedback", status: "pending", detail: "" },
+      { id: "reflections", label: "#northstar notes", status: "pending", detail: "" },
+      { id: "vault", label: "Vault activity", status: "pending", detail: "" },
+      { id: "assess", label: "LLM assessment", status: "pending", detail: "" },
+      { id: "save", label: "Save", status: "pending", detail: "" }
+    ];
+    const stepEls = this.renderCycleLog(steps);
+    try {
+      const today = new Date();
+      const dateStr = today.toISOString().split("T")[0];
+      await this.agent.runCycle(dateStr, (stepId, status, detail) => {
+        const step = steps.find((s) => s.id === stepId);
+        if (!step)
+          return;
+        step.status = status;
+        step.detail = detail;
+        this.updateStepEl(stepEls, step);
+      });
+      new import_obsidian5.Notice("North Star cycle complete!");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      new import_obsidian5.Notice(`Cycle failed: ${msg}`);
+      console.error("North Star cycle error:", e);
+      for (const step of steps) {
+        if (step.status === "running") {
+          step.status = "done";
+          step.detail = `Failed: ${msg}`;
+          this.updateStepEl(stepEls, step, true);
+        }
+      }
+    }
+    await new Promise((r) => setTimeout(r, 1500));
+    this.isRunning = false;
+    this.renderBoard();
+  }
+  renderCycleLog(steps) {
+    if (!this.boardEl)
+      return /* @__PURE__ */ new Map();
+    const selectors = [
+      ".acta-northstar-score-section",
+      ".acta-northstar-breakdown",
+      ".acta-northstar-drift",
+      ".acta-northstar-momentum",
+      ".acta-northstar-no-assessment",
+      ".acta-northstar-loading",
+      ".acta-northstar-cycle-log"
+    ];
+    for (const sel of selectors) {
+      const el = this.boardEl.querySelector(sel);
+      if (el)
+        el.remove();
+    }
+    const logContainer = this.boardEl.createDiv({ cls: "acta-northstar-cycle-log" });
+    logContainer.createEl("h5", { text: "OBSERVE + ASSESS" });
+    const stepEls = /* @__PURE__ */ new Map();
+    for (const step of steps) {
+      const row = logContainer.createDiv({ cls: "acta-northstar-step" });
+      row.addClass("acta-northstar-step-pending");
+      const indicator = row.createSpan({ cls: "acta-northstar-step-indicator" });
+      indicator.textContent = "\u25CB";
+      const content = row.createDiv({ cls: "acta-northstar-step-content" });
+      content.createSpan({ cls: "acta-northstar-step-label", text: step.label });
+      content.createSpan({ cls: "acta-northstar-step-detail" });
+      stepEls.set(step.id, row);
+    }
+    return stepEls;
+  }
+  updateStepEl(stepEls, step, failed = false) {
+    const row = stepEls.get(step.id);
+    if (!row)
+      return;
+    const indicator = row.querySelector(".acta-northstar-step-indicator");
+    const detail = row.querySelector(".acta-northstar-step-detail");
+    row.removeClass("acta-northstar-step-pending", "acta-northstar-step-running", "acta-northstar-step-done", "acta-northstar-step-failed");
+    if (failed) {
+      row.addClass("acta-northstar-step-failed");
+      if (indicator)
+        indicator.textContent = "\u2717";
+    } else if (step.status === "running") {
+      row.addClass("acta-northstar-step-running");
+      if (indicator)
+        indicator.textContent = "\u25CF";
+    } else if (step.status === "done") {
+      row.addClass("acta-northstar-step-done");
+      if (indicator)
+        indicator.textContent = "\u2713";
+    } else {
+      row.addClass("acta-northstar-step-pending");
+      if (indicator)
+        indicator.textContent = "\u25CB";
+    }
+    if (detail)
+      detail.textContent = step.detail ? ` \u2014 ${step.detail}` : "";
+  }
+};
+
+// src/settings.ts
+var import_obsidian6 = require("obsidian");
+var ActaTaskSettingTab = class extends import_obsidian6.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -589,7 +978,7 @@ var ActaTaskSettingTab = class extends import_obsidian4.PluginSettingTab {
       text: "Tasks with inline hashtags (e.g. - [ ] #people do something) are automatically tracked on the board.",
       cls: "setting-item-description"
     });
-    new import_obsidian4.Setting(containerEl).setName("Excluded tags").setDesc(
+    new import_obsidian6.Setting(containerEl).setName("Excluded tags").setDesc(
       "Comma-separated list of tags to exclude (e.g. #daily, #template)"
     ).addText(
       (text) => text.setPlaceholder("#daily, #template").setValue(this.plugin.settings.excludedTags.join(", ")).onChange(async (value) => {
@@ -597,7 +986,7 @@ var ActaTaskSettingTab = class extends import_obsidian4.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian4.Setting(containerEl).setName("Excluded folders").setDesc(
+    new import_obsidian6.Setting(containerEl).setName("Excluded folders").setDesc(
       "Comma-separated list of folders to exclude (e.g. templates, archive)"
     ).addText(
       (text) => text.setPlaceholder("templates, archive").setValue(this.plugin.settings.excludedFolders.join(", ")).onChange(async (value) => {
@@ -605,27 +994,42 @@ var ActaTaskSettingTab = class extends import_obsidian4.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian4.Setting(containerEl).setName("Show completed tasks").setDesc("Display completed tasks in the board").addToggle(
+    new import_obsidian6.Setting(containerEl).setName("Show completed tasks").setDesc("Display completed tasks in the board").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.showCompleted).onChange(async (value) => {
         this.plugin.settings.showCompleted = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian4.Setting(containerEl).setName("Show source note").setDesc("Display the source note name next to each task").addToggle(
+    new import_obsidian6.Setting(containerEl).setName("Show source note").setDesc("Display the source note name next to each task").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.showSourceNote).onChange(async (value) => {
         this.plugin.settings.showSourceNote = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian4.Setting(containerEl).setName("Topic sort order").setDesc("How to sort topic sections").addDropdown(
+    new import_obsidian6.Setting(containerEl).setName("Topic sort order").setDesc("How to sort topic sections").addDropdown(
       (dropdown) => dropdown.addOption("alphabetical", "Alphabetical").addOption("taskCount", "Task count (most first)").setValue(this.plugin.settings.topicSortOrder).onChange(async (value) => {
         this.plugin.settings.topicSortOrder = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian4.Setting(containerEl).setName("Task sort order").setDesc("How to sort tasks within a topic").addDropdown(
+    new import_obsidian6.Setting(containerEl).setName("Task sort order").setDesc("How to sort tasks within a topic").addDropdown(
       (dropdown) => dropdown.addOption("incompleteFirst", "Incomplete first").addOption("byFile", "By file").setValue(this.plugin.settings.taskSortOrder).onChange(async (value) => {
         this.plugin.settings.taskSortOrder = value;
+        await this.plugin.saveSettings();
+      })
+    );
+    containerEl.createEl("h2", { text: "North Star" });
+    new import_obsidian6.Setting(containerEl).setName("Anthropic API key").setDesc("Required for North Star alignment assessments").addText(
+      (text) => text.setPlaceholder("sk-ant-...").setValue(this.plugin.settings.anthropicApiKey).then((t) => {
+        t.inputEl.type = "password";
+      }).onChange(async (value) => {
+        this.plugin.settings.anthropicApiKey = value.trim();
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian6.Setting(containerEl).setName("Model").setDesc("Claude model for assessments").addDropdown(
+      (dropdown) => dropdown.addOption("claude-sonnet-4-20250514", "Claude Sonnet 4").addOption("claude-haiku-4-5-20251001", "Claude Haiku 4.5").addOption("claude-opus-4-6", "Claude Opus 4.6").setValue(this.plugin.settings.northStarModel).onChange(async (value) => {
+        this.plugin.settings.northStarModel = value;
         await this.plugin.saveSettings();
       })
     );
@@ -633,7 +1037,7 @@ var ActaTaskSettingTab = class extends import_obsidian4.PluginSettingTab {
 };
 
 // src/taskManager.ts
-var import_obsidian5 = require("obsidian");
+var import_obsidian7 = require("obsidian");
 var TASK_REGEX_BASE = /^[\s]*[-*]\s+\[([ xX])\]\s*/;
 var INLINE_TAG_REGEX = /#[\w\-\/]+/g;
 var TaskManager = class {
@@ -695,12 +1099,12 @@ var TaskManager = class {
    */
   async addTask(task) {
     if (this.data.addedTasks[task.id]) {
-      new import_obsidian5.Notice("Task is already on the board");
+      new import_obsidian7.Notice("Task is already on the board");
       return false;
     }
     this.data.addedTasks[task.id] = task;
     await this.saveData();
-    new import_obsidian5.Notice("Task added to board");
+    new import_obsidian7.Notice("Task added to board");
     return true;
   }
   /**
@@ -722,7 +1126,7 @@ var TaskManager = class {
       return;
     delete this.data.addedTasks[taskId];
     await this.saveData();
-    new import_obsidian5.Notice("Task removed from board");
+    new import_obsidian7.Notice("Task removed from board");
   }
   /**
    * Check if task is already added
@@ -738,7 +1142,7 @@ var TaskManager = class {
     const toRemove = [];
     for (const [taskId, task] of Object.entries(this.data.addedTasks)) {
       const file = this.app.vault.getAbstractFileByPath(task.filePath);
-      if (!(file instanceof import_obsidian5.TFile)) {
+      if (!(file instanceof import_obsidian7.TFile)) {
         toRemove.push(taskId);
         continue;
       }
@@ -866,7 +1270,7 @@ var TaskScanner = class {
 };
 
 // src/taskToggler.ts
-var import_obsidian6 = require("obsidian");
+var import_obsidian8 = require("obsidian");
 var CHECKBOX_REGEX = /^([\s]*[-*]\s+\[)([ xX])(\]\s*.*)/;
 var TaskToggler = class {
   constructor(app) {
@@ -874,7 +1278,7 @@ var TaskToggler = class {
   }
   async toggleTask(task) {
     const file = this.app.vault.getAbstractFileByPath(task.filePath);
-    if (!(file instanceof import_obsidian6.TFile))
+    if (!(file instanceof import_obsidian8.TFile))
       return false;
     const content = await this.app.vault.read(file);
     const lines = content.split("\n");
@@ -893,7 +1297,7 @@ var TaskToggler = class {
 };
 
 // src/feedbackManager.ts
-var import_obsidian7 = require("obsidian");
+var import_obsidian9 = require("obsidian");
 var TAG_REGEX = /#[\w\-\/\u4e00-\u9fa5❤️]+/g;
 var FeedbackManager = class {
   constructor(app, settings, data, saveData) {
@@ -925,16 +1329,16 @@ var FeedbackManager = class {
     );
   }
   /**
-   * Check if a line is a task checkbox line
+   * Check if a line is a list item (- or * prefix)
    */
-  isTaskLine(line) {
-    return /^[\s]*[-*]\s+\[[ xX]\]\s+/.test(line);
+  isListItem(line) {
+    return /^[\s]*[-*]\s+/.test(line);
   }
   /**
    * Parse feedback item from a line
    */
   parseFeedbackFromLine(line, lineNumber, file) {
-    if (!this.isTaskLine(line)) {
+    if (!this.isListItem(line)) {
       return null;
     }
     if (!this.hasFeedbackTag(line)) {
@@ -947,7 +1351,7 @@ var FeedbackManager = class {
       );
       return !isTriggerTag && !this.settings.excludedTags.includes(tag);
     });
-    const displayText = line.replace(/^[\s]*[-*]\s+\[[ xX]\]\s+/, "").replace(TAG_REGEX, "").trim();
+    const displayText = line.replace(/^[\s]*[-*]\s+/, "").replace(TAG_REGEX, "").trim();
     return {
       id: `${file.path}:${lineNumber}`,
       text: displayText,
@@ -987,7 +1391,7 @@ var FeedbackManager = class {
       return;
     delete this.data.addedFeedback[itemId];
     await this.saveData();
-    new import_obsidian7.Notice("Feedback removed from board");
+    new import_obsidian9.Notice("Feedback removed from board");
   }
   /**
    * Check if feedback is already added
@@ -1003,7 +1407,7 @@ var FeedbackManager = class {
     const toRemove = [];
     for (const [itemId, item] of Object.entries(this.data.addedFeedback)) {
       const file = this.app.vault.getAbstractFileByPath(item.filePath);
-      if (!(file instanceof import_obsidian7.TFile)) {
+      if (!(file instanceof import_obsidian9.TFile)) {
         toRemove.push(itemId);
         continue;
       }
@@ -1131,7 +1535,7 @@ var FeedbackScanner = class {
 };
 
 // src/negativeFeedbackManager.ts
-var import_obsidian8 = require("obsidian");
+var import_obsidian10 = require("obsidian");
 var TAG_REGEX2 = /#[\w\-\/\u4e00-\u9fa5😒]+/g;
 var NegativeFeedbackManager = class {
   constructor(app, settings, data, saveData) {
@@ -1163,16 +1567,16 @@ var NegativeFeedbackManager = class {
     );
   }
   /**
-   * Check if a line is a task checkbox line
+   * Check if a line is a list item (- or * prefix)
    */
-  isTaskLine(line) {
-    return /^[\s]*[-*]\s+\[[ xX]\]\s+/.test(line);
+  isListItem(line) {
+    return /^[\s]*[-*]\s+/.test(line);
   }
   /**
    * Parse feedback item from a line
    */
   parseFeedbackFromLine(line, lineNumber, file) {
-    if (!this.isTaskLine(line)) {
+    if (!this.isListItem(line)) {
       return null;
     }
     if (!this.hasNegativeFeedbackTag(line)) {
@@ -1185,7 +1589,7 @@ var NegativeFeedbackManager = class {
       );
       return !isTriggerTag && !this.settings.excludedTags.includes(tag);
     });
-    const displayText = line.replace(/^[\s]*[-*]\s+\[[ xX]\]\s+/, "").replace(TAG_REGEX2, "").trim();
+    const displayText = line.replace(/^[\s]*[-*]\s+/, "").replace(TAG_REGEX2, "").trim();
     return {
       id: `${file.path}:${lineNumber}`,
       text: displayText,
@@ -1225,7 +1629,7 @@ var NegativeFeedbackManager = class {
       return;
     delete this.data.addedNegativeFeedback[itemId];
     await this.saveData();
-    new import_obsidian8.Notice("Negative feedback removed from board");
+    new import_obsidian10.Notice("Negative feedback removed from board");
   }
   /**
    * Check if feedback is already added
@@ -1241,7 +1645,7 @@ var NegativeFeedbackManager = class {
     const toRemove = [];
     for (const [itemId, item] of Object.entries(this.data.addedNegativeFeedback)) {
       const file = this.app.vault.getAbstractFileByPath(item.filePath);
-      if (!(file instanceof import_obsidian8.TFile)) {
+      if (!(file instanceof import_obsidian10.TFile)) {
         toRemove.push(itemId);
         continue;
       }
@@ -1368,14 +1772,459 @@ var NegativeFeedbackScanner = class {
   }
 };
 
+// src/northStarTypes.ts
+var DEFAULT_SIGNAL_WEIGHTS = {
+  goalDirectDeepWork: 0.3,
+  taskCompletion: 0.15,
+  reflectionDepth: 0.25,
+  pipelineActivity: 0.2,
+  feedbackSignals: 0.1
+};
+var DEFAULT_POLICY = {
+  signalWeights: { ...DEFAULT_SIGNAL_WEIGHTS },
+  checkInPrompts: [],
+  milestones: [],
+  version: 1
+};
+var DEFAULT_NORTHSTAR_DATA = {
+  goal: null,
+  policy: { ...DEFAULT_POLICY, signalWeights: { ...DEFAULT_SIGNAL_WEIGHTS }, milestones: [] },
+  assessments: [],
+  archivedGoals: []
+};
+var TIME_ANNOTATION_REGEX = /@(\d{1,2}(?::?\d{2})?)\s*(?:AM|PM|am|pm)?\s*[-–]\s*(\d{1,2}(?::?\d{2})?)\s*(?:AM|PM|am|pm)?/;
+
+// src/northStarManager.ts
+var NorthStarManager = class {
+  constructor(app, settings, data, saveData) {
+    this.app = app;
+    this.settings = settings;
+    this.data = data;
+    this.saveData = saveData;
+  }
+  updateSettings(settings) {
+    this.settings = settings;
+  }
+  updateData(data) {
+    this.data = data;
+  }
+  getGoal() {
+    return this.data.goal;
+  }
+  getPolicy() {
+    return this.data.policy;
+  }
+  getAssessments() {
+    return this.data.assessments;
+  }
+  getLatestAssessment() {
+    if (this.data.assessments.length === 0)
+      return null;
+    return this.data.assessments[this.data.assessments.length - 1];
+  }
+  getDayNumber() {
+    const goal = this.data.goal;
+    if (!goal)
+      return 0;
+    const lockedDate = new Date(goal.lockedAt);
+    lockedDate.setHours(0, 0, 0, 0);
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const diffMs = now.getTime() - lockedDate.getTime();
+    return Math.floor(diffMs / (1e3 * 60 * 60 * 24)) + 1;
+  }
+  getDaysLeft() {
+    const goal = this.data.goal;
+    if (!goal)
+      return 0;
+    return Math.max(0, goal.timeWindowDays - this.getDayNumber() + 1);
+  }
+  async setGoal(text, timeWindowDays) {
+    if (this.data.goal) {
+      this.data.goal.active = false;
+      this.data.archivedGoals.push(this.data.goal);
+    }
+    const goal = {
+      id: `ns-${Date.now()}`,
+      text,
+      timeWindowDays,
+      lockedAt: Date.now(),
+      currentPhase: "exploration",
+      active: true
+    };
+    this.data.goal = goal;
+    this.data.policy = {
+      signalWeights: { ...DEFAULT_SIGNAL_WEIGHTS },
+      checkInPrompts: [],
+      milestones: [],
+      version: 1
+    };
+    this.data.assessments = [];
+    await this.saveData();
+    return goal;
+  }
+  async addAssessment(assessment) {
+    const existingIndex = this.data.assessments.findIndex(
+      (a) => a.date === assessment.date
+    );
+    if (existingIndex >= 0) {
+      this.data.assessments[existingIndex] = assessment;
+    } else {
+      this.data.assessments.push(assessment);
+    }
+    await this.saveData();
+  }
+  async archiveGoal() {
+    if (!this.data.goal)
+      return;
+    this.data.goal.active = false;
+    this.data.archivedGoals.push(this.data.goal);
+    this.data.goal = null;
+    this.data.assessments = [];
+    this.data.policy = { ...DEFAULT_POLICY, signalWeights: { ...DEFAULT_SIGNAL_WEIGHTS }, milestones: [] };
+    await this.saveData();
+  }
+};
+
+// src/northStarLlmClient.ts
+var import_obsidian11 = require("obsidian");
+var NorthStarLlmClient = class {
+  constructor(settings) {
+    this.settings = settings;
+  }
+  updateSettings(settings) {
+    this.settings = settings;
+  }
+  async call(systemPrompt, userMessage) {
+    const apiKey = this.settings.anthropicApiKey;
+    if (!apiKey) {
+      throw new Error("Anthropic API key not set. Go to Settings \u2192 Acta Task \u2192 North Star to add it.");
+    }
+    let response;
+    try {
+      response = await (0, import_obsidian11.requestUrl)({
+        url: "https://api.anthropic.com/v1/messages",
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01"
+        },
+        body: JSON.stringify({
+          model: this.settings.northStarModel,
+          max_tokens: 4096,
+          system: systemPrompt,
+          messages: [{ role: "user", content: userMessage }]
+        }),
+        throw: false
+      });
+    } catch (e) {
+      throw new Error(`Network error: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    if (response.status === 401) {
+      throw new Error("Invalid API key. Check your key in Settings \u2192 Acta Task \u2192 North Star.");
+    }
+    if (response.status !== 200) {
+      throw new Error(`API error (${response.status}): ${response.text}`);
+    }
+    const data = response.json;
+    if (data.content && data.content.length > 0 && data.content[0].type === "text") {
+      return data.content[0].text;
+    }
+    throw new Error("Unexpected API response format");
+  }
+};
+
+// src/northStarObserver.ts
+var NorthStarObserver = class {
+  constructor(app, settings, taskData, feedbackData, negativeFeedbackData) {
+    this.app = app;
+    this.settings = settings;
+    this.taskData = taskData;
+    this.feedbackData = feedbackData;
+    this.negativeFeedbackData = negativeFeedbackData;
+  }
+  updateSettings(settings) {
+    this.settings = settings;
+  }
+  updateData(taskData, feedbackData, negativeFeedbackData) {
+    this.taskData = taskData;
+    this.feedbackData = feedbackData;
+    this.negativeFeedbackData = negativeFeedbackData;
+  }
+  async observe(dateStr, onStep) {
+    onStep == null ? void 0 : onStep("tasks", "Scanning task board...");
+    const tasks = this.extractTaskSignals(dateStr);
+    const completedCount = tasks.filter((t) => t.completed).length;
+    const deepWorkCount = tasks.filter((t) => t.effort === "deep_work").length;
+    onStep == null ? void 0 : onStep("tasks", `Found ${tasks.length} tasks (${completedCount} completed, ${deepWorkCount} deep work)`);
+    onStep == null ? void 0 : onStep("positive-feedback", "Scanning positive feedback...");
+    const positiveFeedback = this.extractPositiveFeedbackSignals(dateStr);
+    onStep == null ? void 0 : onStep("positive-feedback", `Found ${positiveFeedback.length} positive feedback entries`);
+    onStep == null ? void 0 : onStep("negative-feedback", "Scanning negative feedback...");
+    const negativeFeedback = this.extractNegativeFeedbackSignals(dateStr);
+    onStep == null ? void 0 : onStep("negative-feedback", `Found ${negativeFeedback.length} negative feedback entries`);
+    const feedback = [...positiveFeedback, ...negativeFeedback];
+    onStep == null ? void 0 : onStep("reflections", "Scanning #northstar reflections...");
+    const reflections = await this.extractReflections(dateStr);
+    onStep == null ? void 0 : onStep("reflections", `Found ${reflections.length} reflections`);
+    onStep == null ? void 0 : onStep("vault", "Checking vault activity...");
+    const vaultActivity = this.getVaultActivity(dateStr);
+    onStep == null ? void 0 : onStep("vault", `${vaultActivity.filesModified} files across ${vaultActivity.foldersActive.length} folders`);
+    return {
+      date: dateStr,
+      tasks,
+      feedback,
+      reflections,
+      vaultActivity
+    };
+  }
+  extractTaskSignals(dateStr) {
+    const signals = [];
+    const compactDate = dateStr.replace(/-/g, "");
+    for (const task of Object.values(this.taskData.addedTasks)) {
+      if (!task.filePath.includes(compactDate))
+        continue;
+      const timeMatch = task.text.match(TIME_ANNOTATION_REGEX);
+      let durationMin;
+      let timeAnnotation;
+      if (timeMatch) {
+        timeAnnotation = timeMatch[0];
+        durationMin = this.parseDuration(timeMatch[1], timeMatch[2]);
+      }
+      signals.push({
+        title: task.text,
+        tags: task.tags,
+        completed: task.completed,
+        timeAnnotation,
+        durationMin,
+        effort: timeMatch ? "deep_work" : "quick_action"
+      });
+    }
+    return signals;
+  }
+  parseDuration(startStr, endStr) {
+    const startHour = this.parseHour(startStr);
+    const endHour = this.parseHour(endStr);
+    let diff = endHour - startHour;
+    if (diff <= 0)
+      diff += 12;
+    return Math.round(diff * 60);
+  }
+  parseHour(timeStr) {
+    const cleaned = timeStr.replace(":", "");
+    if (cleaned.length <= 2) {
+      return parseInt(cleaned, 10);
+    }
+    const hours = parseInt(cleaned.slice(0, -2), 10);
+    const minutes = parseInt(cleaned.slice(-2), 10);
+    return hours + minutes / 60;
+  }
+  extractPositiveFeedbackSignals(dateStr) {
+    const signals = [];
+    const compactDate = dateStr.replace(/-/g, "");
+    for (const item of Object.values(this.feedbackData.addedFeedback)) {
+      if (!item.filePath.includes(compactDate))
+        continue;
+      signals.push({
+        text: item.text,
+        tags: item.tags,
+        type: "positive"
+      });
+    }
+    return signals;
+  }
+  extractNegativeFeedbackSignals(dateStr) {
+    const signals = [];
+    const compactDate = dateStr.replace(/-/g, "");
+    for (const item of Object.values(this.negativeFeedbackData.addedNegativeFeedback)) {
+      if (!item.filePath.includes(compactDate))
+        continue;
+      signals.push({
+        text: item.text,
+        tags: item.tags,
+        type: "negative"
+      });
+    }
+    return signals;
+  }
+  async extractReflections(dateStr) {
+    const reflections = [];
+    const compactDate = dateStr.replace(/-/g, "");
+    const files = this.app.vault.getMarkdownFiles();
+    for (const file of files) {
+      if (!file.path.includes(compactDate))
+        continue;
+      const content = await this.app.vault.cachedRead(file);
+      const lines = content.split("\n");
+      for (const line of lines) {
+        if (line.toLowerCase().includes("#northstar")) {
+          const cleanText = line.replace(/^[\s]*[-*]\s+/, "").replace(/#northstar/gi, "").trim();
+          if (cleanText.length > 0) {
+            reflections.push({
+              text: cleanText,
+              filePath: file.path
+            });
+          }
+        }
+      }
+    }
+    return reflections;
+  }
+  getVaultActivity(dateStr) {
+    var _a;
+    const compactDate = dateStr.replace(/-/g, "");
+    const files = this.app.vault.getMarkdownFiles();
+    let filesModified = 0;
+    const foldersSet = /* @__PURE__ */ new Set();
+    for (const file of files) {
+      if (file.path.includes(compactDate)) {
+        filesModified++;
+        const folder = ((_a = file.parent) == null ? void 0 : _a.path) || "/";
+        foldersSet.add(folder);
+      }
+    }
+    return {
+      filesModified,
+      foldersActive: Array.from(foldersSet)
+    };
+  }
+};
+
+// src/northStarAgent.ts
+var NorthStarAgent = class {
+  constructor(manager, observer, llmClient) {
+    this.manager = manager;
+    this.observer = observer;
+    this.llmClient = llmClient;
+  }
+  async runCycle(dateStr, onProgress) {
+    const goal = this.manager.getGoal();
+    if (!goal) {
+      throw new Error("No active goal set");
+    }
+    const policy = this.manager.getPolicy();
+    const dayNumber = this.manager.getDayNumber();
+    const signals = await this.observer.observe(dateStr, (step, detail) => {
+      const isRunning = detail.startsWith("Scanning") || detail.startsWith("Checking");
+      onProgress == null ? void 0 : onProgress(step, isRunning ? "running" : "done", detail);
+    });
+    onProgress == null ? void 0 : onProgress("assess", "running", "Sending signals to Claude for assessment...");
+    const assessment = await this.assess(goal, signals, policy, dayNumber, dateStr);
+    onProgress == null ? void 0 : onProgress("assess", "done", `Assessment complete \u2014 score: ${assessment.overallScore}/100`);
+    onProgress == null ? void 0 : onProgress("save", "running", "Saving assessment...");
+    await this.manager.addAssessment(assessment);
+    onProgress == null ? void 0 : onProgress("save", "done", "Assessment saved to data.json");
+    return assessment;
+  }
+  async assess(goal, signals, policy, dayNumber, dateStr) {
+    const systemPrompt = this.buildAssessSystemPrompt();
+    const userMessage = this.buildAssessUserMessage(goal, signals, policy, dayNumber);
+    const rawResponse = await this.llmClient.call(systemPrompt, userMessage);
+    return this.parseAssessResponse(rawResponse, dateStr, dayNumber, signals, policy.version);
+  }
+  buildAssessSystemPrompt() {
+    return `You are an alignment assessment agent for a personal goal-tracking system called North Star.
+
+Your job: Given a user's locked goal, today's activity signals, and the current measurement policy (signal weights), produce a structured assessment of how aligned today's work was with the goal.
+
+You MUST respond with valid JSON only \u2014 no markdown, no explanation outside the JSON. The JSON must match this schema:
+
+{
+  "overallScore": <number 0-100>,
+  "signalBreakdown": [
+    {
+      "category": "<string: goalDirectDeepWork | taskCompletion | reflectionDepth | pipelineActivity | feedbackSignals>",
+      "weight": <number: the weight from the policy>,
+      "score": <number: points earned>,
+      "maxScore": <number: max possible points for this category = weight * 100>,
+      "reasoning": "<string: 1-2 sentence explanation>"
+    }
+  ],
+  "driftIndicators": ["<string: specific observation of misalignment>"],
+  "momentumIndicators": ["<string: specific observation of progress>"]
+}
+
+Rules:
+- overallScore = sum of all signalBreakdown scores
+- Each category's maxScore = weight * 100
+- Be specific in reasoning \u2014 reference actual task names, feedback entries, and reflections
+- Drift indicators should cite concrete evidence of misalignment
+- Momentum indicators should cite concrete evidence of progress
+- If signals are empty for a category, score it low but explain why
+- Be honest and calibrated \u2014 don't inflate scores`;
+  }
+  buildAssessUserMessage(goal, signals, policy, dayNumber) {
+    return `## Locked Goal
+"${goal.text}"
+Time window: ${goal.timeWindowDays} days
+Current phase: ${goal.currentPhase}
+Day: ${dayNumber} of ${goal.timeWindowDays}
+
+## Measurement Policy (v${policy.version})
+Signal weights:
+- goalDirectDeepWork: ${policy.signalWeights.goalDirectDeepWork}
+- taskCompletion: ${policy.signalWeights.taskCompletion}
+- reflectionDepth: ${policy.signalWeights.reflectionDepth}
+- pipelineActivity: ${policy.signalWeights.pipelineActivity}
+- feedbackSignals: ${policy.signalWeights.feedbackSignals}
+
+${policy.milestones.length > 0 ? `Milestones:
+${policy.milestones.map((m) => `- ${m.text} (deadline: ${m.deadline}, completed: ${m.completed})`).join("\n")}` : "No milestones set yet."}
+
+## Today's Signals (${signals.date})
+
+### Tasks (${signals.tasks.length})
+${signals.tasks.length > 0 ? signals.tasks.map((t) => `- [${t.completed ? "x" : " "}] ${t.title} ${t.tags.join(" ")} | effort: ${t.effort}${t.timeAnnotation ? ` | time: ${t.timeAnnotation} (${t.durationMin}min)` : ""}`).join("\n") : "No tasks recorded today."}
+
+### Feedback (${signals.feedback.length})
+${signals.feedback.length > 0 ? signals.feedback.map((f) => `- [${f.type}] ${f.text} ${f.tags.join(" ")}`).join("\n") : "No feedback entries today."}
+
+### Reflections (${signals.reflections.length})
+${signals.reflections.length > 0 ? signals.reflections.map((r) => `- ${r.text}`).join("\n") : "No #northstar reflections today."}
+
+### Vault Activity
+- Files modified: ${signals.vaultActivity.filesModified}
+- Active folders: ${signals.vaultActivity.foldersActive.join(", ") || "none"}
+
+Produce the assessment JSON now.`;
+  }
+  parseAssessResponse(raw, dateStr, dayNumber, signals, policyVersion) {
+    let jsonStr = raw.trim();
+    const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (jsonMatch) {
+      jsonStr = jsonMatch[1].trim();
+    }
+    const parsed = JSON.parse(jsonStr);
+    return {
+      id: `assess-${dateStr}-${Date.now()}`,
+      date: dateStr,
+      dayNumber,
+      overallScore: Math.max(0, Math.min(100, parsed.overallScore || 0)),
+      signalBreakdown: (parsed.signalBreakdown || []).map((s) => ({
+        category: s.category,
+        weight: s.weight,
+        score: s.score,
+        maxScore: s.maxScore,
+        reasoning: s.reasoning
+      })),
+      driftIndicators: parsed.driftIndicators || [],
+      momentumIndicators: parsed.momentumIndicators || [],
+      rawSignals: signals,
+      policyVersion
+    };
+  }
+};
+
 // src/main.ts
-var ActaTaskPlugin = class extends import_obsidian9.Plugin {
+var ActaTaskPlugin = class extends import_obsidian12.Plugin {
   constructor() {
     super(...arguments);
     this.settings = DEFAULT_SETTINGS;
     this.data = DEFAULT_DATA;
     this.feedbackData = DEFAULT_FEEDBACK_DATA;
     this.negativeFeedbackData = DEFAULT_NEGATIVE_FEEDBACK_DATA;
+    this.northStarData = { ...DEFAULT_NORTHSTAR_DATA };
     this.taskManager = null;
     this.scanner = null;
     this.toggler = null;
@@ -1383,12 +2232,17 @@ var ActaTaskPlugin = class extends import_obsidian9.Plugin {
     this.feedbackScanner = null;
     this.negativeFeedbackManager = null;
     this.negativeFeedbackScanner = null;
+    this.northStarManager = null;
+    this.northStarLlmClient = null;
+    this.northStarObserver = null;
+    this.northStarAgent = null;
   }
   async onload() {
     await this.loadSettings();
     await this.loadTaskData();
     await this.loadFeedbackData();
     await this.loadNegativeFeedbackData();
+    await this.loadNorthStarData();
     this.taskManager = new TaskManager(
       this.app,
       this.settings,
@@ -1419,6 +2273,25 @@ var ActaTaskPlugin = class extends import_obsidian9.Plugin {
       this.negativeFeedbackManager,
       this.settings
     );
+    this.northStarManager = new NorthStarManager(
+      this.app,
+      this.settings,
+      this.northStarData,
+      () => this.saveNorthStarData()
+    );
+    this.northStarLlmClient = new NorthStarLlmClient(this.settings);
+    this.northStarObserver = new NorthStarObserver(
+      this.app,
+      this.settings,
+      this.data,
+      this.feedbackData,
+      this.negativeFeedbackData
+    );
+    this.northStarAgent = new NorthStarAgent(
+      this.northStarManager,
+      this.northStarObserver,
+      this.northStarLlmClient
+    );
     this.registerView(ACTA_TASK_VIEW_TYPE, (leaf) => {
       return new TaskBoardView(
         leaf,
@@ -1441,6 +2314,14 @@ var ActaTaskPlugin = class extends import_obsidian9.Plugin {
         leaf,
         this.negativeFeedbackScanner,
         this.negativeFeedbackManager,
+        this.settings
+      );
+    });
+    this.registerView(ACTA_NORTHSTAR_VIEW_TYPE, (leaf) => {
+      return new NorthStarBoardView(
+        leaf,
+        this.northStarManager,
+        this.northStarAgent,
         this.settings
       );
     });
@@ -1483,12 +2364,26 @@ var ActaTaskPlugin = class extends import_obsidian9.Plugin {
       name: "Refresh \u{1F612} \u8D1F\u53CD\u9988board",
       callback: () => this.refreshNegativeFeedbackBoard()
     });
+    this.addRibbonIcon("star", "Open North Star board", () => {
+      this.openNorthStarBoard();
+    });
+    this.addCommand({
+      id: "open-acta-northstar-board",
+      name: "Open North Star board",
+      callback: () => this.openNorthStarBoard()
+    });
+    this.addCommand({
+      id: "refresh-acta-northstar-board",
+      name: "Refresh North Star board",
+      callback: () => this.refreshNorthStarBoard()
+    });
     this.addSettingTab(new ActaTaskSettingTab(this.app, this));
   }
   async onunload() {
     this.app.workspace.detachLeavesOfType(ACTA_TASK_VIEW_TYPE);
     this.app.workspace.detachLeavesOfType(ACTA_FEEDBACK_VIEW_TYPE);
     this.app.workspace.detachLeavesOfType(ACTA_NEGATIVE_FEEDBACK_VIEW_TYPE);
+    this.app.workspace.detachLeavesOfType(ACTA_NORTHSTAR_VIEW_TYPE);
   }
   async loadSettings() {
     const data = await this.loadData();
@@ -1499,7 +2394,8 @@ var ActaTaskPlugin = class extends import_obsidian9.Plugin {
       settings: this.settings,
       tasks: this.data,
       feedback: this.feedbackData,
-      negativeFeedback: this.negativeFeedbackData
+      negativeFeedback: this.negativeFeedbackData,
+      northStar: this.northStarData
     });
     if (this.taskManager) {
       this.taskManager.updateSettings(this.settings);
@@ -1519,6 +2415,18 @@ var ActaTaskPlugin = class extends import_obsidian9.Plugin {
     if (this.negativeFeedbackScanner) {
       this.negativeFeedbackScanner.updateSettings(this.settings);
     }
+    if (this.northStarManager) {
+      this.northStarManager.updateSettings(this.settings);
+    }
+    if (this.northStarLlmClient) {
+      this.northStarLlmClient.updateSettings(this.settings);
+    }
+    if (this.northStarObserver) {
+      this.northStarObserver.updateSettings(this.settings);
+    }
+    const northStarView = this.getActiveNorthStarView();
+    if (northStarView)
+      northStarView.updateSettings(this.settings);
     const taskView = this.getActiveTaskView();
     if (taskView)
       taskView.updateSettings(this.settings);
@@ -1539,7 +2447,8 @@ var ActaTaskPlugin = class extends import_obsidian9.Plugin {
       settings: this.settings,
       tasks: this.data,
       feedback: this.feedbackData,
-      negativeFeedback: this.negativeFeedbackData
+      negativeFeedback: this.negativeFeedbackData,
+      northStar: this.northStarData
     });
   }
   async loadFeedbackData() {
@@ -1555,7 +2464,8 @@ var ActaTaskPlugin = class extends import_obsidian9.Plugin {
       settings: this.settings,
       tasks: this.data,
       feedback: this.feedbackData,
-      negativeFeedback: this.negativeFeedbackData
+      negativeFeedback: this.negativeFeedbackData,
+      northStar: this.northStarData
     });
   }
   async loadNegativeFeedbackData() {
@@ -1571,7 +2481,34 @@ var ActaTaskPlugin = class extends import_obsidian9.Plugin {
       settings: this.settings,
       tasks: this.data,
       feedback: this.feedbackData,
-      negativeFeedback: this.negativeFeedbackData
+      negativeFeedback: this.negativeFeedbackData,
+      northStar: this.northStarData
+    });
+  }
+  async loadNorthStarData() {
+    const data = await this.loadData();
+    this.northStarData = Object.assign(
+      {},
+      DEFAULT_NORTHSTAR_DATA,
+      data == null ? void 0 : data.northStar
+    );
+    if (!this.northStarData.policy) {
+      this.northStarData.policy = { ...DEFAULT_NORTHSTAR_DATA.policy };
+    }
+    if (!this.northStarData.assessments) {
+      this.northStarData.assessments = [];
+    }
+    if (!this.northStarData.archivedGoals) {
+      this.northStarData.archivedGoals = [];
+    }
+  }
+  async saveNorthStarData() {
+    await this.saveData({
+      settings: this.settings,
+      tasks: this.data,
+      feedback: this.feedbackData,
+      negativeFeedback: this.negativeFeedbackData,
+      northStar: this.northStarData
     });
   }
   getActiveTaskView() {
@@ -1660,6 +2597,37 @@ var ActaTaskPlugin = class extends import_obsidian9.Plugin {
     if (leaf) {
       await leaf.setViewState({
         type: ACTA_NEGATIVE_FEEDBACK_VIEW_TYPE,
+        active: true
+      });
+      this.app.workspace.revealLeaf(leaf);
+    }
+  }
+  getActiveNorthStarView() {
+    const leaves = this.app.workspace.getLeavesOfType(
+      ACTA_NORTHSTAR_VIEW_TYPE
+    );
+    if (leaves.length > 0) {
+      return leaves[0].view;
+    }
+    return null;
+  }
+  refreshNorthStarBoard() {
+    const view = this.getActiveNorthStarView();
+    if (view)
+      view.refresh();
+  }
+  async openNorthStarBoard() {
+    const existing = this.app.workspace.getLeavesOfType(
+      ACTA_NORTHSTAR_VIEW_TYPE
+    );
+    if (existing.length > 0) {
+      this.app.workspace.revealLeaf(existing[0]);
+      return;
+    }
+    const leaf = this.app.workspace.getRightLeaf(false);
+    if (leaf) {
+      await leaf.setViewState({
+        type: ACTA_NORTHSTAR_VIEW_TYPE,
         active: true
       });
       this.app.workspace.revealLeaf(leaf);

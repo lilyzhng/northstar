@@ -11,10 +11,12 @@ import {
 	ACTA_TASK_VIEW_TYPE,
 	ACTA_FEEDBACK_VIEW_TYPE,
 	ACTA_NEGATIVE_FEEDBACK_VIEW_TYPE,
+	ACTA_NORTHSTAR_VIEW_TYPE,
 } from "./types";
 import { TaskBoardView } from "./taskBoardView";
 import { FeedbackBoardView } from "./feedbackBoardView";
 import { NegativeFeedbackBoardView } from "./negativeFeedbackBoardView";
+import { NorthStarBoardView } from "./northStarBoardView";
 import { ActaTaskSettingTab } from "./settings";
 import { TaskManager } from "./taskManager";
 import { TaskScanner } from "./taskScanner";
@@ -23,12 +25,18 @@ import { FeedbackManager } from "./feedbackManager";
 import { FeedbackScanner } from "./feedbackScanner";
 import { NegativeFeedbackManager } from "./negativeFeedbackManager";
 import { NegativeFeedbackScanner } from "./negativeFeedbackScanner";
+import { ActaNorthStarData, DEFAULT_NORTHSTAR_DATA } from "./northStarTypes";
+import { NorthStarManager } from "./northStarManager";
+import { NorthStarLlmClient } from "./northStarLlmClient";
+import { NorthStarObserver } from "./northStarObserver";
+import { NorthStarAgent } from "./northStarAgent";
 
 export default class ActaTaskPlugin extends Plugin {
 	settings: ActaTaskSettings = DEFAULT_SETTINGS;
 	data: ActaTaskData = DEFAULT_DATA;
 	feedbackData: ActaFeedbackData = DEFAULT_FEEDBACK_DATA;
 	negativeFeedbackData: ActaNegativeFeedbackData = DEFAULT_NEGATIVE_FEEDBACK_DATA;
+	northStarData: ActaNorthStarData = { ...DEFAULT_NORTHSTAR_DATA };
 	taskManager: TaskManager | null = null;
 	scanner: TaskScanner | null = null;
 	toggler: TaskToggler | null = null;
@@ -36,12 +44,17 @@ export default class ActaTaskPlugin extends Plugin {
 	feedbackScanner: FeedbackScanner | null = null;
 	negativeFeedbackManager: NegativeFeedbackManager | null = null;
 	negativeFeedbackScanner: NegativeFeedbackScanner | null = null;
+	northStarManager: NorthStarManager | null = null;
+	northStarLlmClient: NorthStarLlmClient | null = null;
+	northStarObserver: NorthStarObserver | null = null;
+	northStarAgent: NorthStarAgent | null = null;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
 		await this.loadTaskData();
 		await this.loadFeedbackData();
 		await this.loadNegativeFeedbackData();
+		await this.loadNorthStarData();
 
 		// Initialize task managers
 		this.taskManager = new TaskManager(
@@ -79,6 +92,27 @@ export default class ActaTaskPlugin extends Plugin {
 			this.settings
 		);
 
+		// Initialize North Star
+		this.northStarManager = new NorthStarManager(
+			this.app,
+			this.settings,
+			this.northStarData,
+			() => this.saveNorthStarData()
+		);
+		this.northStarLlmClient = new NorthStarLlmClient(this.settings);
+		this.northStarObserver = new NorthStarObserver(
+			this.app,
+			this.settings,
+			this.data,
+			this.feedbackData,
+			this.negativeFeedbackData
+		);
+		this.northStarAgent = new NorthStarAgent(
+			this.northStarManager,
+			this.northStarObserver,
+			this.northStarLlmClient
+		);
+
 		// Register task board view
 		this.registerView(ACTA_TASK_VIEW_TYPE, (leaf) => {
 			return new TaskBoardView(
@@ -106,6 +140,16 @@ export default class ActaTaskPlugin extends Plugin {
 				leaf,
 				this.negativeFeedbackScanner!,
 				this.negativeFeedbackManager!,
+				this.settings
+			);
+		});
+
+		// Register North Star board view
+		this.registerView(ACTA_NORTHSTAR_VIEW_TYPE, (leaf) => {
+			return new NorthStarBoardView(
+				leaf,
+				this.northStarManager!,
+				this.northStarAgent!,
 				this.settings
 			);
 		});
@@ -161,6 +205,23 @@ export default class ActaTaskPlugin extends Plugin {
 			callback: () => this.refreshNegativeFeedbackBoard(),
 		});
 
+		// North Star board ribbon and commands
+		this.addRibbonIcon("star", "Open North Star board", () => {
+			this.openNorthStarBoard();
+		});
+
+		this.addCommand({
+			id: "open-acta-northstar-board",
+			name: "Open North Star board",
+			callback: () => this.openNorthStarBoard(),
+		});
+
+		this.addCommand({
+			id: "refresh-acta-northstar-board",
+			name: "Refresh North Star board",
+			callback: () => this.refreshNorthStarBoard(),
+		});
+
 		this.addSettingTab(new ActaTaskSettingTab(this.app, this));
 	}
 
@@ -168,6 +229,7 @@ export default class ActaTaskPlugin extends Plugin {
 		this.app.workspace.detachLeavesOfType(ACTA_TASK_VIEW_TYPE);
 		this.app.workspace.detachLeavesOfType(ACTA_FEEDBACK_VIEW_TYPE);
 		this.app.workspace.detachLeavesOfType(ACTA_NEGATIVE_FEEDBACK_VIEW_TYPE);
+		this.app.workspace.detachLeavesOfType(ACTA_NORTHSTAR_VIEW_TYPE);
 	}
 
 	async loadSettings(): Promise<void> {
@@ -181,6 +243,7 @@ export default class ActaTaskPlugin extends Plugin {
 			tasks: this.data,
 			feedback: this.feedbackData,
 			negativeFeedback: this.negativeFeedbackData,
+			northStar: this.northStarData,
 		});
 		// Propagate settings to managers and views
 		if (this.taskManager) {
@@ -201,6 +264,17 @@ export default class ActaTaskPlugin extends Plugin {
 		if (this.negativeFeedbackScanner) {
 			this.negativeFeedbackScanner.updateSettings(this.settings);
 		}
+		if (this.northStarManager) {
+			this.northStarManager.updateSettings(this.settings);
+		}
+		if (this.northStarLlmClient) {
+			this.northStarLlmClient.updateSettings(this.settings);
+		}
+		if (this.northStarObserver) {
+			this.northStarObserver.updateSettings(this.settings);
+		}
+		const northStarView = this.getActiveNorthStarView();
+		if (northStarView) northStarView.updateSettings(this.settings);
 		const taskView = this.getActiveTaskView();
 		if (taskView) taskView.updateSettings(this.settings);
 		const feedbackView = this.getActiveFeedbackView();
@@ -222,6 +296,7 @@ export default class ActaTaskPlugin extends Plugin {
 			tasks: this.data,
 			feedback: this.feedbackData,
 			negativeFeedback: this.negativeFeedbackData,
+			northStar: this.northStarData,
 		});
 	}
 
@@ -240,6 +315,7 @@ export default class ActaTaskPlugin extends Plugin {
 			tasks: this.data,
 			feedback: this.feedbackData,
 			negativeFeedback: this.negativeFeedbackData,
+			northStar: this.northStarData,
 		});
 	}
 
@@ -258,6 +334,36 @@ export default class ActaTaskPlugin extends Plugin {
 			tasks: this.data,
 			feedback: this.feedbackData,
 			negativeFeedback: this.negativeFeedbackData,
+			northStar: this.northStarData,
+		});
+	}
+
+	async loadNorthStarData(): Promise<void> {
+		const data = await this.loadData();
+		this.northStarData = Object.assign(
+			{},
+			DEFAULT_NORTHSTAR_DATA,
+			data?.northStar
+		);
+		// Ensure nested defaults
+		if (!this.northStarData.policy) {
+			this.northStarData.policy = { ...DEFAULT_NORTHSTAR_DATA.policy };
+		}
+		if (!this.northStarData.assessments) {
+			this.northStarData.assessments = [];
+		}
+		if (!this.northStarData.archivedGoals) {
+			this.northStarData.archivedGoals = [];
+		}
+	}
+
+	async saveNorthStarData(): Promise<void> {
+		await this.saveData({
+			settings: this.settings,
+			tasks: this.data,
+			feedback: this.feedbackData,
+			negativeFeedback: this.negativeFeedbackData,
+			northStar: this.northStarData,
 		});
 	}
 
@@ -356,6 +462,40 @@ export default class ActaTaskPlugin extends Plugin {
 		if (leaf) {
 			await leaf.setViewState({
 				type: ACTA_NEGATIVE_FEEDBACK_VIEW_TYPE,
+				active: true,
+			});
+			this.app.workspace.revealLeaf(leaf);
+		}
+	}
+
+	private getActiveNorthStarView(): NorthStarBoardView | null {
+		const leaves = this.app.workspace.getLeavesOfType(
+			ACTA_NORTHSTAR_VIEW_TYPE
+		);
+		if (leaves.length > 0) {
+			return leaves[0].view as NorthStarBoardView;
+		}
+		return null;
+	}
+
+	private refreshNorthStarBoard(): void {
+		const view = this.getActiveNorthStarView();
+		if (view) view.refresh();
+	}
+
+	private async openNorthStarBoard(): Promise<void> {
+		const existing = this.app.workspace.getLeavesOfType(
+			ACTA_NORTHSTAR_VIEW_TYPE
+		);
+		if (existing.length > 0) {
+			this.app.workspace.revealLeaf(existing[0]);
+			return;
+		}
+
+		const leaf = this.app.workspace.getRightLeaf(false);
+		if (leaf) {
+			await leaf.setViewState({
+				type: ACTA_NORTHSTAR_VIEW_TYPE,
 				active: true,
 			});
 			this.app.workspace.revealLeaf(leaf);

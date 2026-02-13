@@ -112,5 +112,37 @@ export class ActaTaskSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})
 			);
+
+		// North Star settings
+		containerEl.createEl("h2", { text: "North Star" });
+
+		new Setting(containerEl)
+			.setName("Anthropic API key")
+			.setDesc("Required for North Star alignment assessments")
+			.addText((text) =>
+				text
+					.setPlaceholder("sk-ant-...")
+					.setValue(this.plugin.settings.anthropicApiKey)
+					.then((t) => { t.inputEl.type = "password"; })
+					.onChange(async (value) => {
+						this.plugin.settings.anthropicApiKey = value.trim();
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Model")
+			.setDesc("Claude model for assessments")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("claude-sonnet-4-20250514", "Claude Sonnet 4")
+					.addOption("claude-haiku-4-5-20251001", "Claude Haiku 4.5")
+					.addOption("claude-opus-4-6", "Claude Opus 4.6")
+					.setValue(this.plugin.settings.northStarModel)
+					.onChange(async (value) => {
+						this.plugin.settings.northStarModel = value;
+						await this.plugin.saveSettings();
+					})
+			);
 	}
 }

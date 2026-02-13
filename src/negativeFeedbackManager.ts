@@ -38,10 +38,10 @@ export class NegativeFeedbackManager {
 	}
 
 	/**
-	 * Check if a line is a task checkbox line
+	 * Check if a line is a list item (- or * prefix)
 	 */
-	isTaskLine(line: string): boolean {
-		return /^[\s]*[-*]\s+\[[ xX]\]\s+/.test(line);
+	isListItem(line: string): boolean {
+		return /^[\s]*[-*]\s+/.test(line);
 	}
 
 	/**
@@ -52,8 +52,8 @@ export class NegativeFeedbackManager {
 		lineNumber: number,
 		file: TFile
 	): FeedbackItem | null {
-		// Only include task lines (- [ ] format)
-		if (!this.isTaskLine(line)) {
+		// Only include list items (- prefix)
+		if (!this.isListItem(line)) {
 			return null;
 		}
 
@@ -76,8 +76,8 @@ export class NegativeFeedbackManager {
 			);
 		});
 
-		// Remove checkbox prefix and all tags from the display text
-		const displayText = line.replace(/^[\s]*[-*]\s+\[[ xX]\]\s+/, "").replace(TAG_REGEX, "").trim();
+		// Remove list prefix and all tags from the display text
+		const displayText = line.replace(/^[\s]*[-*]\s+/, "").replace(TAG_REGEX, "").trim();
 
 		return {
 			id: `${file.path}:${lineNumber}`,
