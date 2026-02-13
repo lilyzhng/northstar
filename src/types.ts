@@ -49,3 +49,33 @@ export const DEFAULT_DATA: ActaTaskData = {
 };
 
 export const ACTA_TASK_VIEW_TYPE = "acta-task-board";
+
+// Feedback types
+export interface FeedbackItem {
+	id: string;           // `${filePath}:${lineNumber}`
+	text: string;         // Feedback text (without tags)
+	filePath: string;
+	fileName: string;
+	line: number;         // Line number in source file
+	tags: string[];       // Topic tags from the line (excluding trigger tags)
+	addedAt: number;      // Timestamp when added to board
+}
+
+export interface FeedbackGroup {
+	tag: string;          // Raw tag e.g. "#coding"
+	displayTag: string;   // Display name e.g. "coding"
+	items: FeedbackItem[];
+	totalCount: number;
+}
+
+export interface ActaFeedbackData {
+	addedFeedback: Record<string, FeedbackItem>; // filePath -> FeedbackItem
+}
+
+export const DEFAULT_FEEDBACK_DATA: ActaFeedbackData = {
+	addedFeedback: {},
+};
+
+export const ACTA_FEEDBACK_VIEW_TYPE = "acta-feedback-board";
+export const FEEDBACK_TRIGGER_TAG = "#正反馈";
+export const FEEDBACK_TRIGGER_TAGS = ["#正反馈", "#❤️"];
