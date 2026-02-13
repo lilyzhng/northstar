@@ -79,3 +79,15 @@ export const DEFAULT_FEEDBACK_DATA: ActaFeedbackData = {
 export const ACTA_FEEDBACK_VIEW_TYPE = "acta-feedback-board";
 export const FEEDBACK_TRIGGER_TAG = "#正反馈";
 export const FEEDBACK_TRIGGER_TAGS = ["#正反馈", "#❤️"];
+
+// Negative Feedback types
+export interface ActaNegativeFeedbackData {
+	addedNegativeFeedback: Record<string, FeedbackItem>; // filePath -> FeedbackItem
+}
+
+export const DEFAULT_NEGATIVE_FEEDBACK_DATA: ActaNegativeFeedbackData = {
+	addedNegativeFeedback: {},
+};
+
+export const ACTA_NEGATIVE_FEEDBACK_VIEW_TYPE = "acta-negative-feedback-board";
+export const NEGATIVE_FEEDBACK_TRIGGER_TAGS = ["#😒"];

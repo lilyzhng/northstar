@@ -223,3 +223,29 @@
 .acta-feedback-text {
 	/* Inherits from .acta-task-text */
 }
+
+/* Negative Feedback Board specific styles */
+.acta-negative-feedback-board {
+	/* Optional: Add a subtle indicator for negative feedback board */
+}
+
+.acta-negative-feedback-board .acta-task-header {
+	/* Subtle color difference for negative feedback board header */
+	border-bottom-color: var(--background-modifier-border-hover);
+}
+
+.acta-negative-feedback-item {
+	/* Add a subtle left border to negative feedback items */
+	border-left: 2px solid var(--text-faint);
+	padding-left: 12px;
+}
+
+.acta-negative-feedback-item:hover {
+	border-left-color: var(--text-muted);
+}
+
+/* Optional: Different accent color for negative feedback topics */
+.acta-negative-feedback-board .acta-task-topic-tag {
+	color: var(--text-normal);
+	opacity: 0.9;
+}

@@ -3,40 +3,40 @@ import {
 	ActaTaskSettings,
 	FeedbackGroup,
 	FeedbackItem,
-	ACTA_FEEDBACK_VIEW_TYPE,
+	ACTA_NEGATIVE_FEEDBACK_VIEW_TYPE,
 } from "./types";
-import { FeedbackScanner } from "./feedbackScanner";
-import { FeedbackManager } from "./feedbackManager";
+import { NegativeFeedbackScanner } from "./negativeFeedbackScanner";
+import { NegativeFeedbackManager } from "./negativeFeedbackManager";
 
-export class FeedbackBoardView extends ItemView {
-	private scanner: FeedbackScanner;
-	private feedbackManager: FeedbackManager;
+export class NegativeFeedbackBoardView extends ItemView {
+	private scanner: NegativeFeedbackScanner;
+	private negativeFeedbackManager: NegativeFeedbackManager;
 	private settings: ActaTaskSettings;
 	private collapsedTopics: Set<string> = new Set();
 	private boardEl: HTMLDivElement | null = null;
 
 	constructor(
 		leaf: WorkspaceLeaf,
-		scanner: FeedbackScanner,
-		feedbackManager: FeedbackManager,
+		scanner: NegativeFeedbackScanner,
+		negativeFeedbackManager: NegativeFeedbackManager,
 		settings: ActaTaskSettings
 	) {
 		super(leaf);
 		this.scanner = scanner;
-		this.feedbackManager = feedbackManager;
+		this.negativeFeedbackManager = negativeFeedbackManager;
 		this.settings = settings;
 	}
 
 	getViewType(): string {
-		return ACTA_FEEDBACK_VIEW_TYPE;
+		return ACTA_NEGATIVE_FEEDBACK_VIEW_TYPE;
 	}
 
 	getDisplayText(): string {
-		return "❤️ 正反馈board";
+		return "😒 负反馈board";
 	}
 
 	getIcon(): string {
-		return "heart";
+		return "frown";
 	}
 
 	async onOpen(): Promise<void> {
@@ -44,7 +44,7 @@ export class FeedbackBoardView extends ItemView {
 		container.empty();
 		container.addClass("acta-task-container");
 
-		this.boardEl = container.createDiv({ cls: "acta-task-board" });
+		this.boardEl = container.createDiv({ cls: "acta-task-board acta-negative-feedback-board" });
 		await this.refresh();
 
 		this.registerEvents();
@@ -94,7 +94,7 @@ export class FeedbackBoardView extends ItemView {
 		const header = this.boardEl.createDiv({ cls: "acta-task-header" });
 		const titleRow = header.createDiv({ cls: "acta-task-title-row" });
 
-		titleRow.createEl("h4", { text: "❤️ 正反馈board" });
+		titleRow.createEl("h4", { text: "😒 负反馈board" });
 
 		const refreshBtn = titleRow.createEl("button", {
 			cls: "acta-task-refresh-btn clickable-icon",
@@ -114,7 +114,7 @@ export class FeedbackBoardView extends ItemView {
 		if (topics.length === 0) {
 			this.boardEl.createDiv({
 				cls: "acta-task-empty",
-				text: "No 正反馈 items yet. Add notes with #正反馈 or #❤️ and a topic tag (e.g. #coding) to see them here.",
+				text: "No 负反馈 items yet. Add notes with #😒 and a topic tag (e.g. #work) to see them here.",
 			});
 			return;
 		}
@@ -175,7 +175,7 @@ export class FeedbackBoardView extends ItemView {
 		item: FeedbackItem
 	): void {
 		const itemEl = parent.createDiv({
-			cls: "acta-task-item acta-feedback-item",
+			cls: "acta-task-item acta-feedback-item acta-negative-feedback-item",
 		});
 
 		// Feedback text
@@ -229,7 +229,7 @@ export class FeedbackBoardView extends ItemView {
 
 		removeBtn.addEventListener("click", async (e) => {
 			e.stopPropagation();
-			await this.feedbackManager.removeFeedback(item.id);
+			await this.negativeFeedbackManager.removeFeedback(item.id);
 			this.refresh();
 		});
 	}

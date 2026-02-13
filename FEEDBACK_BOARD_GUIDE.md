@@ -1,6 +1,6 @@
-# 正反馈 Board Guide
+# ❤️ 正反馈board Guide
 
-The 正反馈 (Positive Feedback) Board is a new feature that helps you track and organize your positive feedback items, similar to how the task board works.
+The ❤️ 正反馈board (Positive Feedback Board) is a feature that helps you track and organize your positive feedback items, similar to how the task board works.
 
 ## How It Works
 
@@ -37,9 +37,9 @@ More text that won't appear on the board.
 
 ### 3. Opening the Board
 
-There are two ways to open the 正反馈 board:
+There are two ways to open the ❤️ 正反馈board:
 1. Click the **heart icon** (❤️) in the left ribbon
-2. Use the command palette: "Open 正反馈 board"
+2. Use the command palette: "Open ❤️ 正反馈board"
 
 ### 4. Using the Board
 
@@ -74,7 +74,7 @@ Shows: "Got positive feedback from the team on my presentation." under #work and
 
 ## Settings
 
-The feedback board shares settings with the task board:
+The ❤️ 正反馈board shares settings with the task board:
 - **Excluded tags**: Tags to ignore when organizing
 - **Excluded folders**: Folders to skip when scanning
 - **Show source note**: Display note metadata

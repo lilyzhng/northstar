@@ -3,35 +3,45 @@ import {
 	ActaTaskSettings,
 	ActaTaskData,
 	ActaFeedbackData,
+	ActaNegativeFeedbackData,
 	DEFAULT_SETTINGS,
 	DEFAULT_DATA,
 	DEFAULT_FEEDBACK_DATA,
+	DEFAULT_NEGATIVE_FEEDBACK_DATA,
 	ACTA_TASK_VIEW_TYPE,
 	ACTA_FEEDBACK_VIEW_TYPE,
+	ACTA_NEGATIVE_FEEDBACK_VIEW_TYPE,
 } from "./types";
 import { TaskBoardView } from "./taskBoardView";
 import { FeedbackBoardView } from "./feedbackBoardView";
+import { NegativeFeedbackBoardView } from "./negativeFeedbackBoardView";
 import { ActaTaskSettingTab } from "./settings";
 import { TaskManager } from "./taskManager";
 import { TaskScanner } from "./taskScanner";
 import { TaskToggler } from "./taskToggler";
 import { FeedbackManager } from "./feedbackManager";
 import { FeedbackScanner } from "./feedbackScanner";
+import { NegativeFeedbackManager } from "./negativeFeedbackManager";
+import { NegativeFeedbackScanner } from "./negativeFeedbackScanner";
 
 export default class ActaTaskPlugin extends Plugin {
 	settings: ActaTaskSettings = DEFAULT_SETTINGS;
 	data: ActaTaskData = DEFAULT_DATA;
 	feedbackData: ActaFeedbackData = DEFAULT_FEEDBACK_DATA;
+	negativeFeedbackData: ActaNegativeFeedbackData = DEFAULT_NEGATIVE_FEEDBACK_DATA;
 	taskManager: TaskManager | null = null;
 	scanner: TaskScanner | null = null;
 	toggler: TaskToggler | null = null;
 	feedbackManager: FeedbackManager | null = null;
 	feedbackScanner: FeedbackScanner | null = null;
+	negativeFeedbackManager: NegativeFeedbackManager | null = null;
+	negativeFeedbackScanner: NegativeFeedbackScanner | null = null;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
 		await this.loadTaskData();
 		await this.loadFeedbackData();
+		await this.loadNegativeFeedbackData();
 
 		// Initialize task managers
 		this.taskManager = new TaskManager(
@@ -56,6 +66,19 @@ export default class ActaTaskPlugin extends Plugin {
 			this.settings
 		);
 
+		// Initialize negative feedback managers
+		this.negativeFeedbackManager = new NegativeFeedbackManager(
+			this.app,
+			this.settings,
+			this.negativeFeedbackData,
+			() => this.saveNegativeFeedbackData()
+		);
+		this.negativeFeedbackScanner = new NegativeFeedbackScanner(
+			this.app,
+			this.negativeFeedbackManager,
+			this.settings
+		);
+
 		// Register task board view
 		this.registerView(ACTA_TASK_VIEW_TYPE, (leaf) => {
 			return new TaskBoardView(
@@ -73,6 +96,16 @@ export default class ActaTaskPlugin extends Plugin {
 				leaf,
 				this.feedbackScanner!,
 				this.feedbackManager!,
+				this.settings
+			);
+		});
+
+		// Register negative feedback board view
+		this.registerView(ACTA_NEGATIVE_FEEDBACK_VIEW_TYPE, (leaf) => {
+			return new NegativeFeedbackBoardView(
+				leaf,
+				this.negativeFeedbackScanner!,
+				this.negativeFeedbackManager!,
 				this.settings
 			);
 		});
@@ -95,20 +128,37 @@ export default class ActaTaskPlugin extends Plugin {
 		});
 
 		// Feedback board ribbon and commands
-		this.addRibbonIcon("heart", "Open 正反馈 Board", () => {
+		this.addRibbonIcon("heart", "Open ❤️ 正反馈board", () => {
 			this.openFeedbackBoard();
 		});
 
 		this.addCommand({
 			id: "open-acta-feedback-board",
-			name: "Open 正反馈 board",
+			name: "Open ❤️ 正反馈board",
 			callback: () => this.openFeedbackBoard(),
 		});
 
 		this.addCommand({
 			id: "refresh-acta-feedback-board",
-			name: "Refresh 正反馈 board",
+			name: "Refresh ❤️ 正反馈board",
 			callback: () => this.refreshFeedbackBoard(),
+		});
+
+		// Negative feedback board ribbon and commands
+		this.addRibbonIcon("frown", "Open 😒 负反馈board", () => {
+			this.openNegativeFeedbackBoard();
+		});
+
+		this.addCommand({
+			id: "open-acta-negative-feedback-board",
+			name: "Open 😒 负反馈board",
+			callback: () => this.openNegativeFeedbackBoard(),
+		});
+
+		this.addCommand({
+			id: "refresh-acta-negative-feedback-board",
+			name: "Refresh 😒 负反馈board",
+			callback: () => this.refreshNegativeFeedbackBoard(),
 		});
 
 		this.addSettingTab(new ActaTaskSettingTab(this.app, this));
@@ -117,6 +167,7 @@ export default class ActaTaskPlugin extends Plugin {
 	async onunload(): Promise<void> {
 		this.app.workspace.detachLeavesOfType(ACTA_TASK_VIEW_TYPE);
 		this.app.workspace.detachLeavesOfType(ACTA_FEEDBACK_VIEW_TYPE);
+		this.app.workspace.detachLeavesOfType(ACTA_NEGATIVE_FEEDBACK_VIEW_TYPE);
 	}
 
 	async loadSettings(): Promise<void> {
@@ -129,6 +180,7 @@ export default class ActaTaskPlugin extends Plugin {
 			settings: this.settings,
 			tasks: this.data,
 			feedback: this.feedbackData,
+			negativeFeedback: this.negativeFeedbackData,
 		});
 		// Propagate settings to managers and views
 		if (this.taskManager) {
@@ -143,10 +195,18 @@ export default class ActaTaskPlugin extends Plugin {
 		if (this.feedbackScanner) {
 			this.feedbackScanner.updateSettings(this.settings);
 		}
+		if (this.negativeFeedbackManager) {
+			this.negativeFeedbackManager.updateSettings(this.settings);
+		}
+		if (this.negativeFeedbackScanner) {
+			this.negativeFeedbackScanner.updateSettings(this.settings);
+		}
 		const taskView = this.getActiveTaskView();
 		if (taskView) taskView.updateSettings(this.settings);
 		const feedbackView = this.getActiveFeedbackView();
 		if (feedbackView) feedbackView.updateSettings(this.settings);
+		const negativeFeedbackView = this.getActiveNegativeFeedbackView();
+		if (negativeFeedbackView) negativeFeedbackView.updateSettings(this.settings);
 		// Force editor refresh for new marker emoji
 		this.app.workspace.updateOptions();
 	}
@@ -161,6 +221,7 @@ export default class ActaTaskPlugin extends Plugin {
 			settings: this.settings,
 			tasks: this.data,
 			feedback: this.feedbackData,
+			negativeFeedback: this.negativeFeedbackData,
 		});
 	}
 
@@ -178,6 +239,25 @@ export default class ActaTaskPlugin extends Plugin {
 			settings: this.settings,
 			tasks: this.data,
 			feedback: this.feedbackData,
+			negativeFeedback: this.negativeFeedbackData,
+		});
+	}
+
+	async loadNegativeFeedbackData(): Promise<void> {
+		const data = await this.loadData();
+		this.negativeFeedbackData = Object.assign(
+			{},
+			DEFAULT_NEGATIVE_FEEDBACK_DATA,
+			data?.negativeFeedback
+		);
+	}
+
+	async saveNegativeFeedbackData(): Promise<void> {
+		await this.saveData({
+			settings: this.settings,
+			tasks: this.data,
+			feedback: this.feedbackData,
+			negativeFeedback: this.negativeFeedbackData,
 		});
 	}
 
@@ -201,6 +281,16 @@ export default class ActaTaskPlugin extends Plugin {
 		return null;
 	}
 
+	private getActiveNegativeFeedbackView(): NegativeFeedbackBoardView | null {
+		const leaves = this.app.workspace.getLeavesOfType(
+			ACTA_NEGATIVE_FEEDBACK_VIEW_TYPE
+		);
+		if (leaves.length > 0) {
+			return leaves[0].view as NegativeFeedbackBoardView;
+		}
+		return null;
+	}
+
 	private refreshBoard(): void {
 		const view = this.getActiveTaskView();
 		if (view) view.refresh();
@@ -208,6 +298,11 @@ export default class ActaTaskPlugin extends Plugin {
 
 	private refreshFeedbackBoard(): void {
 		const view = this.getActiveFeedbackView();
+		if (view) view.refresh();
+	}
+
+	private refreshNegativeFeedbackBoard(): void {
+		const view = this.getActiveNegativeFeedbackView();
 		if (view) view.refresh();
 	}
 
@@ -242,6 +337,25 @@ export default class ActaTaskPlugin extends Plugin {
 		if (leaf) {
 			await leaf.setViewState({
 				type: ACTA_FEEDBACK_VIEW_TYPE,
+				active: true,
+			});
+			this.app.workspace.revealLeaf(leaf);
+		}
+	}
+
+	private async openNegativeFeedbackBoard(): Promise<void> {
+		const existing = this.app.workspace.getLeavesOfType(
+			ACTA_NEGATIVE_FEEDBACK_VIEW_TYPE
+		);
+		if (existing.length > 0) {
+			this.app.workspace.revealLeaf(existing[0]);
+			return;
+		}
+
+		const leaf = this.app.workspace.getRightLeaf(false);
+		if (leaf) {
+			await leaf.setViewState({
+				type: ACTA_NEGATIVE_FEEDBACK_VIEW_TYPE,
 				active: true,
 			});
 			this.app.workspace.revealLeaf(leaf);
