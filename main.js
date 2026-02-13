@@ -934,7 +934,7 @@ var FeedbackManager = class {
    * Parse feedback item from a line
    */
   parseFeedbackFromLine(line, lineNumber, file) {
-    if (this.isTaskLine(line)) {
+    if (!this.isTaskLine(line)) {
       return null;
     }
     if (!this.hasFeedbackTag(line)) {
@@ -947,7 +947,7 @@ var FeedbackManager = class {
       );
       return !isTriggerTag && !this.settings.excludedTags.includes(tag);
     });
-    const displayText = line.replace(TAG_REGEX, "").trim();
+    const displayText = line.replace(/^[\s]*[-*]\s+\[[ xX]\]\s+/, "").replace(TAG_REGEX, "").trim();
     return {
       id: `${file.path}:${lineNumber}`,
       text: displayText,
@@ -1172,7 +1172,7 @@ var NegativeFeedbackManager = class {
    * Parse feedback item from a line
    */
   parseFeedbackFromLine(line, lineNumber, file) {
-    if (this.isTaskLine(line)) {
+    if (!this.isTaskLine(line)) {
       return null;
     }
     if (!this.hasNegativeFeedbackTag(line)) {
@@ -1185,7 +1185,7 @@ var NegativeFeedbackManager = class {
       );
       return !isTriggerTag && !this.settings.excludedTags.includes(tag);
     });
-    const displayText = line.replace(TAG_REGEX2, "").trim();
+    const displayText = line.replace(/^[\s]*[-*]\s+\[[ xX]\]\s+/, "").replace(TAG_REGEX2, "").trim();
     return {
       id: `${file.path}:${lineNumber}`,
       text: displayText,

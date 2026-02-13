@@ -52,8 +52,8 @@ export class FeedbackManager {
 		lineNumber: number,
 		file: TFile
 	): FeedbackItem | null {
-		// Skip task lines
-		if (this.isTaskLine(line)) {
+		// Only include task lines (- [ ] format)
+		if (!this.isTaskLine(line)) {
 			return null;
 		}
 
@@ -76,8 +76,8 @@ export class FeedbackManager {
 			);
 		});
 
-		// Remove all tags from the display text
-		const displayText = line.replace(TAG_REGEX, "").trim();
+		// Remove checkbox prefix and all tags from the display text
+		const displayText = line.replace(/^[\s]*[-*]\s+\[[ xX]\]\s+/, "").replace(TAG_REGEX, "").trim();
 
 		return {
 			id: `${file.path}:${lineNumber}`,
