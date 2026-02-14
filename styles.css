@@ -1,6 +1,7 @@
 .acta-task-container {
 	padding: 0;
-	overflow-y: auto;
+	overflow-y: hidden;
+	height: 100%;
 }
 
 .acta-task-board {
@@ -254,6 +255,10 @@
 
 .acta-northstar-board {
 	padding: 12px;
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	overflow: hidden;
 }
 
 /* Header */
@@ -627,4 +632,375 @@
 
 .acta-northstar-step-failed .acta-northstar-step-detail {
 	color: var(--text-error, #e74c3c);
+}
+
+/* ========== Tinker Chat (Claudian-style) ========== */
+
+.acta-northstar-tinker-container {
+	margin-top: 12px;
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	overflow: hidden;
+}
+
+.acta-northstar-tinker-container h5 {
+	margin: 0 0 4px 0;
+	font-size: 0.8em;
+	font-weight: 600;
+	color: var(--text-muted);
+	flex-shrink: 0;
+}
+
+/* Messages */
+.acta-northstar-tinker-messages {
+	flex: 1;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	padding: 12px 0;
+	min-height: 0;
+}
+
+.acta-northstar-tinker-messages::-webkit-scrollbar {
+	width: 6px;
+}
+
+.acta-northstar-tinker-messages::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.acta-northstar-tinker-messages::-webkit-scrollbar-thumb {
+	background: var(--background-modifier-border);
+	border-radius: 3px;
+}
+
+.acta-northstar-tinker-messages::-webkit-scrollbar-thumb:hover {
+	background: var(--background-modifier-border-hover);
+}
+
+/* Message bubbles */
+.acta-northstar-tinker-bubble {
+	padding: 10px 14px;
+	border-radius: 8px;
+	max-width: 95%;
+	word-wrap: break-word;
+}
+
+.acta-northstar-tinker-bubble-user {
+	align-self: flex-end;
+	background: rgba(0, 0, 0, 0.3);
+	border-end-end-radius: 4px;
+}
+
+.acta-northstar-tinker-bubble-assistant {
+	align-self: stretch;
+	width: 100%;
+	max-width: 100%;
+	background: transparent;
+	border-end-start-radius: 4px;
+	padding: 10px 0;
+}
+
+.acta-northstar-tinker-bubble-content {
+	line-height: 1.5;
+	user-select: text;
+	-webkit-user-select: text;
+	overflow-wrap: break-word;
+}
+
+.acta-northstar-tinker-bubble-content p {
+	margin: 0 0 8px 0;
+}
+
+.acta-northstar-tinker-bubble-content p:last-child {
+	margin-bottom: 0;
+}
+
+.acta-northstar-tinker-bubble-content ul,
+.acta-northstar-tinker-bubble-content ol {
+	margin: 8px 0;
+	padding-inline-start: 20px;
+}
+
+.acta-northstar-tinker-bubble-content strong {
+	font-weight: 600;
+}
+
+/* Input container */
+.acta-northstar-input-container {
+	position: relative;
+	flex-shrink: 0;
+	padding: 12px 0 8px 0;
+}
+
+.acta-northstar-input-box {
+	display: flex;
+	flex-direction: column;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	background: var(--background-primary);
+	min-height: 110px;
+}
+
+.acta-northstar-input-box:focus-within {
+	border-color: var(--interactive-accent);
+}
+
+/* Textarea */
+.acta-northstar-input {
+	width: 100%;
+	flex: 1 1 0;
+	min-height: 60px;
+	resize: none;
+	padding: 8px 10px 10px 10px;
+	border: none !important;
+	border-radius: 6px;
+	background: transparent !important;
+	color: var(--text-normal);
+	font-family: inherit;
+	font-size: 14px;
+	line-height: 1.4;
+	box-shadow: none !important;
+	overflow-y: auto;
+}
+
+.acta-northstar-input:hover,
+.acta-northstar-input:focus {
+	outline: none !important;
+	border: none !important;
+	background: transparent !important;
+	box-shadow: none !important;
+}
+
+.acta-northstar-input::placeholder {
+	color: var(--text-muted);
+}
+
+.acta-northstar-input:disabled {
+	opacity: 0.5;
+}
+
+/* Input toolbar */
+.acta-northstar-input-toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-shrink: 0;
+	padding: 4px 6px 6px 6px;
+}
+
+/* Model selector (hover dropdown like Claudian) */
+.acta-northstar-model-selector {
+	position: relative;
+}
+
+.acta-northstar-model-btn {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 4px 8px;
+	border-radius: 4px;
+	cursor: pointer;
+	color: var(--text-muted);
+	font-size: 12px;
+	transition: color 0.2s ease;
+}
+
+.acta-northstar-model-btn:hover {
+	color: var(--text-normal);
+}
+
+.acta-northstar-model-chevron {
+	font-size: 8px;
+	line-height: 1;
+}
+
+.acta-northstar-model-dropdown {
+	position: absolute;
+	bottom: 100%;
+	left: 0;
+	margin-bottom: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.15);
+	z-index: 1000;
+	width: max-content;
+	padding: 4px;
+	opacity: 0;
+	visibility: hidden;
+	transition: opacity 0.15s ease, visibility 0.15s ease;
+}
+
+.acta-northstar-model-selector:hover .acta-northstar-model-dropdown {
+	opacity: 1;
+	visibility: visible;
+}
+
+.acta-northstar-model-option {
+	padding: 4px 8px;
+	cursor: pointer;
+	font-size: 12px;
+	color: var(--text-muted);
+	border-radius: 3px;
+	transition: background 0.1s ease, color 0.1s ease;
+	white-space: nowrap;
+}
+
+.acta-northstar-model-option:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.acta-northstar-model-option.is-selected {
+	background: rgba(var(--interactive-accent-rgb, 58, 135, 209), 0.15);
+	color: var(--interactive-accent);
+	font-weight: 500;
+}
+
+/* Send button */
+.acta-northstar-send-btn {
+	background: transparent;
+	border: none;
+	cursor: pointer;
+	padding: 4px;
+	border-radius: 4px;
+	color: var(--text-muted);
+	display: flex;
+	align-items: center;
+	transition: background 0.15s ease, color 0.15s ease;
+}
+
+.acta-northstar-send-btn:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.acta-northstar-send-btn.is-disabled {
+	opacity: 0.3;
+	cursor: not-allowed;
+}
+
+.acta-northstar-send-btn svg {
+	width: 16px;
+	height: 16px;
+}
+
+/* Typing indicator */
+.acta-northstar-tinker-typing {
+	align-self: flex-start;
+	display: flex;
+	gap: 4px;
+	padding: 10px 14px;
+}
+
+.acta-northstar-tinker-dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--text-muted);
+	animation: acta-northstar-tinker-bounce 1.4s ease-in-out infinite;
+}
+
+.acta-northstar-tinker-dot:nth-child(2) {
+	animation-delay: 0.2s;
+}
+
+.acta-northstar-tinker-dot:nth-child(3) {
+	animation-delay: 0.4s;
+}
+
+@keyframes acta-northstar-tinker-bounce {
+	0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+	30% { transform: translateY(-4px); opacity: 1; }
+}
+
+/* Error message */
+.acta-northstar-tinker-error {
+	font-size: 0.85em;
+	color: var(--text-error, #e74c3c);
+	padding: 8px 10px;
+	border-left: 2px solid var(--text-error, #e74c3c);
+	border-radius: 0 4px 4px 0;
+}
+
+/* ========== Tool Steps (inline in chat) ========== */
+
+.acta-northstar-tool-step {
+	width: 100%;
+	padding: 8px 12px;
+	margin: 4px 0;
+	background: var(--background-secondary);
+	border-radius: 8px;
+	font-size: 0.85em;
+	line-height: 1.4;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	gap: 6px;
+}
+
+.acta-northstar-tool-substep {
+	width: 100%;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 2px 0 2px 20px;
+	font-size: 0.9em;
+}
+
+.acta-northstar-tool-substep .acta-northstar-step-indicator {
+	font-size: 0.8em;
+}
+
+.acta-northstar-tool-substep .acta-northstar-step-label {
+	font-weight: 400;
+	color: var(--text-muted);
+}
+
+.acta-northstar-tool-substep.acta-northstar-step-done .acta-northstar-step-indicator {
+	color: var(--text-success, #27ae60);
+}
+
+/* ========== Check-in Note Link (inline in chat) ========== */
+
+.acta-northstar-checkin-link {
+	width: 100%;
+	margin: 6px 0;
+	padding: 10px 14px;
+	border-left: 3px solid var(--text-accent);
+	background: var(--background-secondary);
+	border-radius: 0 8px 8px 0;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 0.85em;
+	transition: background 150ms ease;
+}
+
+.acta-northstar-checkin-link:hover {
+	background: var(--background-modifier-hover);
+}
+
+.acta-northstar-checkin-score {
+	font-weight: 700;
+	font-size: 1.1em;
+}
+
+.acta-northstar-checkin-label {
+	color: var(--text-normal);
+	flex: 1;
+}
+
+.acta-northstar-checkin-open {
+	color: var(--text-accent);
+	font-size: 0.85em;
+	white-space: nowrap;
 }

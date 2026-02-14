@@ -150,6 +150,7 @@ export default class ActaTaskPlugin extends Plugin {
 				leaf,
 				this.northStarManager!,
 				this.northStarAgent!,
+				this.northStarLlmClient!,
 				this.settings
 			);
 		});
@@ -354,6 +355,9 @@ export default class ActaTaskPlugin extends Plugin {
 		}
 		if (!this.northStarData.archivedGoals) {
 			this.northStarData.archivedGoals = [];
+		}
+		if (!this.northStarData.tinkerMessages) {
+			this.northStarData.tinkerMessages = [];
 		}
 	}
 

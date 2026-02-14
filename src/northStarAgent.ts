@@ -18,6 +18,23 @@ export class NorthStarAgent {
 		private llmClient: NorthStarLlmClient
 	) {}
 
+	async observeSignals(dateStr: string, onProgress?: CycleProgressCallback): Promise<DaySignals> {
+		return this.observer.observe(dateStr, (step, detail) => {
+			const isRunning = detail.startsWith("Scanning") || detail.startsWith("Checking");
+			onProgress?.(step, isRunning ? "running" : "done", detail);
+		});
+	}
+
+	async assessSignals(dateStr: string, signals: DaySignals): Promise<Assessment> {
+		const goal = this.manager.getGoal();
+		if (!goal) throw new Error("No active goal set");
+		const policy = this.manager.getPolicy();
+		const dayNumber = this.manager.getDayNumber();
+		const assessment = await this.assess(goal, signals, policy, dayNumber, dateStr);
+		await this.manager.addAssessment(assessment);
+		return assessment;
+	}
+
 	async runCycle(dateStr: string, onProgress?: CycleProgressCallback): Promise<Assessment> {
 		const goal = this.manager.getGoal();
 		if (!goal) {

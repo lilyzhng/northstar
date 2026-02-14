@@ -87,11 +87,29 @@ export interface Assessment {
 	policyVersion: number;
 }
 
+// Anthropic API content block types for tool use
+export interface TextBlock { type: "text"; text: string }
+export interface ToolUseBlock { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
+export interface ToolResultBlock { type: "tool_result"; tool_use_id: string; content: string; is_error?: boolean }
+export type ContentBlock = TextBlock | ToolUseBlock | ToolResultBlock;
+
+export interface ApiMessage { role: "user" | "assistant"; content: string | ContentBlock[] }
+export interface ToolDefinition { name: string; description: string; input_schema: Record<string, unknown> }
+export interface ApiResponse { content: ContentBlock[]; stop_reason: string }
+
+export interface TinkerMessage {
+	role: "user" | "assistant";
+	content: string;
+	timestamp: number;
+	assessmentId?: string;
+}
+
 export interface ActaNorthStarData {
 	goal: NorthStarGoal | null;
 	policy: NorthStarPolicy;
 	assessments: Assessment[];
 	archivedGoals: NorthStarGoal[];
+	tinkerMessages: TinkerMessage[];
 }
 
 export const DEFAULT_SIGNAL_WEIGHTS: SignalWeights = {
@@ -114,6 +132,7 @@ export const DEFAULT_NORTHSTAR_DATA: ActaNorthStarData = {
 	policy: { ...DEFAULT_POLICY, signalWeights: { ...DEFAULT_SIGNAL_WEIGHTS }, milestones: [] },
 	assessments: [],
 	archivedGoals: [],
+	tinkerMessages: [],
 };
 
 export const TIME_ANNOTATION_REGEX = /@(\d{1,2}(?::?\d{2})?)\s*(?:AM|PM|am|pm)?\s*[-–]\s*(\d{1,2}(?::?\d{2})?)\s*(?:AM|PM|am|pm)?/;

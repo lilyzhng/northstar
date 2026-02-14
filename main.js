@@ -625,13 +625,91 @@ var NorthStarGoalModal = class extends import_obsidian4.Modal {
 };
 
 // src/northStarBoardView.ts
+var TOOL_DEFINITIONS = [
+  {
+    name: "get_today_date",
+    description: "Get today's local date, day number, and whether a check-in already exists for today. Always call this first before observe_signals or run_assessment.",
+    input_schema: {
+      type: "object",
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: "observe_signals",
+    description: "Scan the vault for signals on a given date: tasks, feedback, reflections, and vault activity. Call get_today_date first, then pass the date here.",
+    input_schema: {
+      type: "object",
+      properties: {
+        date: {
+          type: "string",
+          description: "The date to observe in YYYY-MM-DD format (from get_today_date)"
+        }
+      },
+      required: ["date"]
+    }
+  },
+  {
+    name: "run_assessment",
+    description: "Run an LLM alignment assessment on collected signals. Call observe_signals first. Pass the same date.",
+    input_schema: {
+      type: "object",
+      properties: {
+        date: {
+          type: "string",
+          description: "The date for this assessment in YYYY-MM-DD format (from get_today_date)"
+        }
+      },
+      required: ["date"]
+    }
+  },
+  {
+    name: "save_conversation_summary",
+    description: "Summarize the current Tinker conversation and append it to today's check-in note. Call this when the user asks to summarize, capture takeaways, or save conversation notes. Write the summary in markdown with key insights, action items, and decisions.",
+    input_schema: {
+      type: "object",
+      properties: {
+        date: {
+          type: "string",
+          description: "The date of the check-in note to append to, in YYYY-MM-DD format (from get_today_date)"
+        },
+        summary: {
+          type: "string",
+          description: "The conversation summary in markdown. Include: key insights, action items, and any decisions made. Use bullet points and keep it concise. If rewriting an existing summary, produce a single unified summary that merges old and new insights."
+        },
+        overwrite: {
+          type: "boolean",
+          description: "Set to true when rewriting an existing summary with merged content. On first call, omit this \u2014 the tool will return existing content for you to merge."
+        }
+      },
+      required: ["date", "summary"]
+    }
+  },
+  {
+    name: "get_assessment_history",
+    description: "Retrieve past assessments for trend analysis.",
+    input_schema: {
+      type: "object",
+      properties: {
+        count: {
+          type: "number",
+          description: "Number of recent assessments to retrieve (default 5)"
+        }
+      },
+      required: []
+    }
+  }
+];
 var NorthStarBoardView = class extends import_obsidian5.ItemView {
-  constructor(leaf, manager, agent, settings) {
+  constructor(leaf, manager, agent, llmClient, settings) {
     super(leaf);
     this.boardEl = null;
-    this.isRunning = false;
+    this.isSending = false;
+    this.chatMessagesEl = null;
+    this.lastObservedSignals = null;
     this.manager = manager;
     this.agent = agent;
+    this.llmClient = llmClient;
     this.settings = settings;
   }
   getViewType() {
@@ -656,14 +734,19 @@ var NorthStarBoardView = class extends import_obsidian5.ItemView {
     this.settings = settings;
   }
   refresh() {
-    if (!this.isRunning) {
+    if (!this.isSending) {
       this.renderBoard();
     }
+  }
+  getLocalDateStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   }
   renderBoard() {
     if (!this.boardEl)
       return;
     this.boardEl.empty();
+    this.chatMessagesEl = null;
     const goal = this.manager.getGoal();
     this.renderHeader();
     if (!goal) {
@@ -671,15 +754,7 @@ var NorthStarBoardView = class extends import_obsidian5.ItemView {
       return;
     }
     this.renderGoalCard();
-    const latest = this.manager.getLatestAssessment();
-    if (!latest) {
-      this.renderNoAssessmentState();
-      return;
-    }
-    this.renderScoreDisplay(latest);
-    this.renderSignalBreakdown(latest);
-    this.renderDriftIndicators(latest);
-    this.renderMomentumIndicators(latest);
+    this.renderTinkerChat();
   }
   renderHeader() {
     if (!this.boardEl)
@@ -688,15 +763,6 @@ var NorthStarBoardView = class extends import_obsidian5.ItemView {
     const titleRow = header.createDiv({ cls: "acta-northstar-title-row" });
     titleRow.createEl("h4", { text: "North Star" });
     const btnGroup = titleRow.createDiv({ cls: "acta-northstar-btn-group" });
-    const goal = this.manager.getGoal();
-    if (goal) {
-      const runBtn = btnGroup.createEl("button", {
-        cls: "acta-northstar-run-btn clickable-icon",
-        attr: { "aria-label": "Run Cycle" }
-      });
-      runBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
-      runBtn.addEventListener("click", () => this.runCycle());
-    }
     const refreshBtn = btnGroup.createEl("button", {
       cls: "acta-northstar-refresh-btn clickable-icon",
       attr: { "aria-label": "Refresh" }
@@ -714,18 +780,6 @@ var NorthStarBoardView = class extends import_obsidian5.ItemView {
       text: "Set Your North Star"
     });
     setBtn.addEventListener("click", () => this.openGoalModal());
-  }
-  renderNoAssessmentState() {
-    if (!this.boardEl)
-      return;
-    const empty = this.boardEl.createDiv({ cls: "acta-northstar-no-assessment" });
-    empty.createEl("p", { text: "No assessment yet. Click the play button to run your first cycle." });
-    if (!this.settings.anthropicApiKey) {
-      empty.createEl("p", {
-        text: "Set your Anthropic API key in Settings \u2192 Acta Task \u2192 North Star first.",
-        cls: "acta-northstar-warning"
-      });
-    }
   }
   renderGoalCard() {
     if (!this.boardEl)
@@ -752,92 +806,6 @@ var NorthStarBoardView = class extends import_obsidian5.ItemView {
       text: `${daysLeft}d left`
     });
   }
-  renderScoreDisplay(assessment) {
-    if (!this.boardEl)
-      return;
-    const scoreSection = this.boardEl.createDiv({ cls: "acta-northstar-score-section" });
-    const scoreEl = scoreSection.createDiv({ cls: "acta-northstar-score" });
-    const scoreNum = scoreEl.createEl("span", {
-      cls: "acta-northstar-score-number",
-      text: `${assessment.overallScore}`
-    });
-    if (assessment.overallScore >= 70) {
-      scoreNum.addClass("acta-northstar-score-good");
-    } else if (assessment.overallScore >= 40) {
-      scoreNum.addClass("acta-northstar-score-mid");
-    } else {
-      scoreNum.addClass("acta-northstar-score-low");
-    }
-    scoreEl.createEl("span", {
-      cls: "acta-northstar-score-label",
-      text: "/100"
-    });
-    scoreSection.createDiv({
-      cls: "acta-northstar-score-date",
-      text: `Day ${assessment.dayNumber} \u2014 ${assessment.date}`
-    });
-  }
-  renderSignalBreakdown(assessment) {
-    if (!this.boardEl)
-      return;
-    const section = this.boardEl.createDiv({ cls: "acta-northstar-breakdown" });
-    section.createEl("h5", { text: "Signal Breakdown" });
-    for (const signal of assessment.signalBreakdown) {
-      this.renderSignalBar(section, signal);
-    }
-  }
-  renderSignalBar(parent, signal) {
-    const row = parent.createDiv({ cls: "acta-northstar-signal-row" });
-    const labelRow = row.createDiv({ cls: "acta-northstar-signal-label-row" });
-    labelRow.createEl("span", {
-      cls: "acta-northstar-signal-name",
-      text: this.formatCategoryName(signal.category)
-    });
-    labelRow.createEl("span", {
-      cls: "acta-northstar-signal-score",
-      text: `${Math.round(signal.score)}/${Math.round(signal.maxScore)}`
-    });
-    const barContainer = row.createDiv({ cls: "acta-northstar-bar-container" });
-    const bar = barContainer.createDiv({ cls: "acta-northstar-bar" });
-    const pct = signal.maxScore > 0 ? signal.score / signal.maxScore * 100 : 0;
-    bar.style.width = `${Math.min(100, Math.max(0, pct))}%`;
-    if (pct >= 70)
-      bar.addClass("acta-northstar-bar-good");
-    else if (pct >= 40)
-      bar.addClass("acta-northstar-bar-mid");
-    else
-      bar.addClass("acta-northstar-bar-low");
-    if (signal.reasoning) {
-      row.createDiv({
-        cls: "acta-northstar-signal-reasoning",
-        text: signal.reasoning
-      });
-    }
-  }
-  renderDriftIndicators(assessment) {
-    if (!this.boardEl || assessment.driftIndicators.length === 0)
-      return;
-    const section = this.boardEl.createDiv({ cls: "acta-northstar-drift" });
-    section.createEl("h5", { text: "Drift Indicators" });
-    for (const drift of assessment.driftIndicators) {
-      section.createDiv({
-        cls: "acta-northstar-drift-item",
-        text: drift
-      });
-    }
-  }
-  renderMomentumIndicators(assessment) {
-    if (!this.boardEl || assessment.momentumIndicators.length === 0)
-      return;
-    const section = this.boardEl.createDiv({ cls: "acta-northstar-momentum" });
-    section.createEl("h5", { text: "Momentum Indicators" });
-    for (const momentum of assessment.momentumIndicators) {
-      section.createDiv({
-        cls: "acta-northstar-momentum-item",
-        text: momentum
-      });
-    }
-  }
   formatCategoryName(category) {
     const names = {
       goalDirectDeepWork: "Goal-Direct Deep Work",
@@ -855,111 +823,472 @@ var NorthStarBoardView = class extends import_obsidian5.ItemView {
       this.renderBoard();
     }).open();
   }
-  // ── Live activity log for the cycle ──
-  async runCycle() {
-    if (this.isRunning)
+  // ── Check-in note creation ──
+  async createCheckInNote(assessment) {
+    const goal = this.manager.getGoal();
+    if (!goal)
       return;
-    if (!this.settings.anthropicApiKey) {
-      new import_obsidian5.Notice("Set your Anthropic API key in Settings \u2192 Acta Task first.");
-      return;
+    const folderPath = "NorthStar/check-ins";
+    const filePath = `${folderPath}/North Star Check-in \u2014 ${assessment.date}.md`;
+    if (!this.app.vault.getAbstractFileByPath(folderPath)) {
+      await this.app.vault.createFolder(folderPath);
     }
-    this.isRunning = true;
-    const steps = [
-      { id: "tasks", label: "Task board", status: "pending", detail: "" },
-      { id: "positive-feedback", label: "Positive feedback", status: "pending", detail: "" },
-      { id: "negative-feedback", label: "Negative feedback", status: "pending", detail: "" },
-      { id: "reflections", label: "#northstar notes", status: "pending", detail: "" },
-      { id: "vault", label: "Vault activity", status: "pending", detail: "" },
-      { id: "assess", label: "LLM assessment", status: "pending", detail: "" },
-      { id: "save", label: "Save", status: "pending", detail: "" }
-    ];
-    const stepEls = this.renderCycleLog(steps);
-    try {
-      const today = new Date();
-      const dateStr = today.toISOString().split("T")[0];
-      await this.agent.runCycle(dateStr, (stepId, status, detail) => {
-        const step = steps.find((s) => s.id === stepId);
-        if (!step)
-          return;
-        step.status = status;
-        step.detail = detail;
-        this.updateStepEl(stepEls, step);
-      });
-      new import_obsidian5.Notice("North Star cycle complete!");
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Unknown error";
-      new import_obsidian5.Notice(`Cycle failed: ${msg}`);
-      console.error("North Star cycle error:", e);
-      for (const step of steps) {
-        if (step.status === "running") {
-          step.status = "done";
-          step.detail = `Failed: ${msg}`;
-          this.updateStepEl(stepEls, step, true);
+    const scoreColor = (pct) => pct >= 70 ? "#27ae60" : pct >= 40 ? "#f39c12" : "#e74c3c";
+    const buildBar = (pct) => {
+      const color = scoreColor(pct);
+      return `<div style="height:6px;background:#e0e0e0;border-radius:3px;overflow:hidden;margin:4px 0 6px 0"><div style="height:100%;width:${Math.min(100, Math.max(0, pct))}%;background:${color};border-radius:3px"></div></div>`;
+    };
+    const overallPct = assessment.overallScore;
+    const overallColor = scoreColor(overallPct);
+    const breakdownHtml = assessment.signalBreakdown.map((s) => {
+      const pct = s.maxScore > 0 ? Math.round(s.score / s.maxScore * 100) : 0;
+      return `<div style="margin-bottom:14px">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px"><span style="font-weight:500;font-size:0.9em">${this.formatCategoryName(s.category)}</span><span style="font-size:0.85em;color:#888">${Math.round(s.score)}/${Math.round(s.maxScore)}</span></div>
+${buildBar(pct)}
+<div style="font-size:0.82em;color:#888;line-height:1.3">${s.reasoning}</div>
+</div>`;
+    }).join("\n");
+    const driftHtml = assessment.driftIndicators.length > 0 ? assessment.driftIndicators.map((d) => `<div style="border-left:2px solid #e74c3c;padding:6px 10px;margin-bottom:4px;font-size:0.9em;background:rgba(231,76,60,0.06);border-radius:0 4px 4px 0">${d}</div>`).join("\n") : `<div style="font-size:0.9em;color:#888">None</div>`;
+    const momentumHtml = assessment.momentumIndicators.length > 0 ? assessment.momentumIndicators.map((m) => `<div style="border-left:2px solid #27ae60;padding:6px 10px;margin-bottom:4px;font-size:0.9em;background:rgba(39,174,96,0.06);border-radius:0 4px 4px 0">${m}</div>`).join("\n") : `<div style="font-size:0.9em;color:#888">None</div>`;
+    const content = `**Goal:** ${goal.text}
+**Day ${assessment.dayNumber} of ${goal.timeWindowDays}** | Phase: ${goal.currentPhase}
+
+<div style="text-align:center;padding:12px 0 4px 0">
+<span style="font-size:2.5em;font-weight:700;color:${overallColor}">${assessment.overallScore}</span><span style="font-size:1em;color:#888">/100</span>
+<div style="font-size:0.8em;color:#888;margin-top:4px">Day ${assessment.dayNumber} \u2014 ${assessment.date}</div>
+</div>
+
+### Signal Breakdown
+
+${breakdownHtml}
+
+---
+
+### Drift Indicators
+
+${driftHtml}
+
+### Momentum Indicators
+
+${momentumHtml}
+`;
+    const existing = this.app.vault.getAbstractFileByPath(filePath);
+    if (existing) {
+      await this.app.vault.modify(existing, content);
+    } else {
+      await this.app.vault.create(filePath, content);
+    }
+  }
+  // ── Check-in note link (inline in chat) ──
+  renderCheckInLink(parent, assessment) {
+    const notePath = `NorthStar/check-ins/North Star Check-in \u2014 ${assessment.date}.md`;
+    const link = parent.createDiv({ cls: "acta-northstar-checkin-link" });
+    const scoreClass = assessment.overallScore >= 70 ? "acta-northstar-score-good" : assessment.overallScore >= 40 ? "acta-northstar-score-mid" : "acta-northstar-score-low";
+    link.createEl("span", { cls: `acta-northstar-checkin-score ${scoreClass}`, text: `${assessment.overallScore}/100` });
+    link.createEl("span", { cls: "acta-northstar-checkin-label", text: ` \u2014 Day ${assessment.dayNumber} Check-in` });
+    link.createEl("span", { cls: "acta-northstar-checkin-open", text: "Open note \u2197" });
+    link.addEventListener("click", () => {
+      this.app.workspace.openLinkText(notePath, "", false);
+    });
+  }
+  // ── Tinker Chat ──
+  renderTinkerChat() {
+    if (!this.boardEl)
+      return;
+    const container = this.boardEl.createDiv({ cls: "acta-northstar-tinker-container" });
+    container.createEl("h5", { text: "Tinker" });
+    const messagesEl = container.createDiv({ cls: "acta-northstar-tinker-messages" });
+    this.chatMessagesEl = messagesEl;
+    const messages = this.manager.getTinkerMessages();
+    for (const msg of messages) {
+      if (msg.assessmentId) {
+        const assessment = this.manager.getAssessments().find((a) => a.id === msg.assessmentId);
+        if (assessment) {
+          this.renderCheckInLink(messagesEl, assessment);
         }
       }
+      this.appendMessageBubble(messagesEl, msg);
     }
-    await new Promise((r) => setTimeout(r, 1500));
-    this.isRunning = false;
-    this.renderBoard();
-  }
-  renderCycleLog(steps) {
-    if (!this.boardEl)
-      return /* @__PURE__ */ new Map();
-    const selectors = [
-      ".acta-northstar-score-section",
-      ".acta-northstar-breakdown",
-      ".acta-northstar-drift",
-      ".acta-northstar-momentum",
-      ".acta-northstar-no-assessment",
-      ".acta-northstar-loading",
-      ".acta-northstar-cycle-log"
+    const inputContainer = container.createDiv({ cls: "acta-northstar-input-container" });
+    const inputBox = inputContainer.createDiv({ cls: "acta-northstar-input-box" });
+    const textarea = inputBox.createEl("textarea", {
+      cls: "acta-northstar-input",
+      attr: { placeholder: "Ask Tinker about your goal...", rows: "3" }
+    });
+    const toolbar = inputBox.createDiv({ cls: "acta-northstar-input-toolbar" });
+    const models = [
+      { value: "claude-haiku-4-5-20251001", label: "Haiku" },
+      { value: "claude-sonnet-4-20250514", label: "Sonnet" },
+      { value: "claude-opus-4-6", label: "Opus" }
     ];
-    for (const sel of selectors) {
-      const el = this.boardEl.querySelector(sel);
-      if (el)
-        el.remove();
+    const currentModel = models.find((m) => m.value === this.settings.northStarModel);
+    const modelSelector = toolbar.createDiv({ cls: "acta-northstar-model-selector" });
+    const modelBtn = modelSelector.createDiv({ cls: "acta-northstar-model-btn" });
+    const modelLabel = modelBtn.createEl("span", { text: (currentModel == null ? void 0 : currentModel.label) || "Sonnet" });
+    modelBtn.createEl("span", { cls: "acta-northstar-model-chevron", text: "\u25B4" });
+    const dropdown = modelSelector.createDiv({ cls: "acta-northstar-model-dropdown" });
+    for (const m of models) {
+      const option = dropdown.createDiv({
+        cls: `acta-northstar-model-option ${m.value === this.settings.northStarModel ? "is-selected" : ""}`,
+        text: m.label
+      });
+      option.addEventListener("click", () => {
+        this.settings.northStarModel = m.value;
+        modelLabel.textContent = m.label;
+        dropdown.querySelectorAll(".acta-northstar-model-option").forEach((el) => el.removeClass("is-selected"));
+        option.addClass("is-selected");
+      });
     }
-    const logContainer = this.boardEl.createDiv({ cls: "acta-northstar-cycle-log" });
-    logContainer.createEl("h5", { text: "OBSERVE + ASSESS" });
-    const stepEls = /* @__PURE__ */ new Map();
-    for (const step of steps) {
-      const row = logContainer.createDiv({ cls: "acta-northstar-step" });
-      row.addClass("acta-northstar-step-pending");
-      const indicator = row.createSpan({ cls: "acta-northstar-step-indicator" });
-      indicator.textContent = "\u25CB";
-      const content = row.createDiv({ cls: "acta-northstar-step-content" });
-      content.createSpan({ cls: "acta-northstar-step-label", text: step.label });
-      content.createSpan({ cls: "acta-northstar-step-detail" });
-      stepEls.set(step.id, row);
-    }
-    return stepEls;
+    const sendBtn = toolbar.createEl("button", {
+      cls: "acta-northstar-send-btn",
+      attr: { "aria-label": "Send" }
+    });
+    sendBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`;
+    const doSend = () => {
+      const text = textarea.value.trim();
+      if (!text || this.isSending)
+        return;
+      textarea.value = "";
+      this.sendTinkerMessage(text, messagesEl, textarea, sendBtn);
+    };
+    sendBtn.addEventListener("click", doSend);
+    textarea.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        doSend();
+      }
+    });
+    requestAnimationFrame(() => {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    });
   }
-  updateStepEl(stepEls, step, failed = false) {
-    const row = stepEls.get(step.id);
-    if (!row)
-      return;
-    const indicator = row.querySelector(".acta-northstar-step-indicator");
-    const detail = row.querySelector(".acta-northstar-step-detail");
-    row.removeClass("acta-northstar-step-pending", "acta-northstar-step-running", "acta-northstar-step-done", "acta-northstar-step-failed");
-    if (failed) {
-      row.addClass("acta-northstar-step-failed");
-      if (indicator)
-        indicator.textContent = "\u2717";
-    } else if (step.status === "running") {
-      row.addClass("acta-northstar-step-running");
-      if (indicator)
-        indicator.textContent = "\u25CF";
-    } else if (step.status === "done") {
-      row.addClass("acta-northstar-step-done");
-      if (indicator)
-        indicator.textContent = "\u2713";
-    } else {
-      row.addClass("acta-northstar-step-pending");
-      if (indicator)
-        indicator.textContent = "\u25CB";
+  appendMessageBubble(container, msg) {
+    const bubble = container.createDiv({
+      cls: `acta-northstar-tinker-bubble acta-northstar-tinker-bubble-${msg.role}`
+    });
+    const contentEl = bubble.createDiv({ cls: "acta-northstar-tinker-bubble-content" });
+    import_obsidian5.MarkdownRenderer.renderMarkdown(msg.content, contentEl, "", this);
+    return bubble;
+  }
+  // ── Tool step indicators ──
+  renderToolStep(container, label) {
+    const step = container.createDiv({ cls: "acta-northstar-tool-step" });
+    const indicator = step.createSpan({ cls: "acta-northstar-step-indicator" });
+    indicator.textContent = "\u25CF";
+    step.createSpan({ cls: "acta-northstar-step-label", text: label });
+    step.addClass("acta-northstar-step-running");
+    container.scrollTop = container.scrollHeight;
+    return step;
+  }
+  renderToolSubstep(parent, text, status) {
+    const sub = parent.createDiv({ cls: "acta-northstar-tool-substep" });
+    const indicator = sub.createSpan({ cls: "acta-northstar-step-indicator" });
+    indicator.textContent = status === "done" ? "\u2713" : "\u25CF";
+    sub.createSpan({ cls: "acta-northstar-step-label", text });
+    sub.addClass(status === "done" ? "acta-northstar-step-done" : "acta-northstar-step-running");
+    return sub;
+  }
+  completeToolStep(stepEl, detail) {
+    stepEl.removeClass("acta-northstar-step-running");
+    stepEl.addClass("acta-northstar-step-done");
+    const indicator = stepEl.querySelector(".acta-northstar-step-indicator");
+    if (indicator)
+      indicator.textContent = "\u2713";
+    if (detail) {
+      stepEl.createSpan({ cls: "acta-northstar-step-detail", text: ` \u2014 ${detail}` });
     }
-    if (detail)
-      detail.textContent = step.detail ? ` \u2014 ${step.detail}` : "";
+  }
+  // ── Typing indicator helpers ──
+  addTypingIndicator(messagesEl) {
+    const typingEl = messagesEl.createDiv({ cls: "acta-northstar-tinker-typing" });
+    typingEl.createSpan({ cls: "acta-northstar-tinker-dot" });
+    typingEl.createSpan({ cls: "acta-northstar-tinker-dot" });
+    typingEl.createSpan({ cls: "acta-northstar-tinker-dot" });
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return typingEl;
+  }
+  // ── Tool execution ──
+  async executeTool(toolName, toolInput, messagesEl) {
+    switch (toolName) {
+      case "get_today_date": {
+        const today = this.getLocalDateStr();
+        const dayNumber = this.manager.getDayNumber();
+        const existing = this.manager.getAssessments().find((a) => a.date === today);
+        const hasCheckin = !!existing;
+        return {
+          result: `Today is ${today}. Day ${dayNumber}. ${hasCheckin ? `A check-in already exists for today (score: ${existing.overallScore}/100). Running again will update it in place.` : "No check-in yet for today."}`
+        };
+      }
+      case "observe_signals": {
+        const dateStr = toolInput.date || this.getLocalDateStr();
+        const stepEl = this.renderToolStep(messagesEl, `Observing vault signals for ${dateStr}...`);
+        const signals = await this.agent.observeSignals(dateStr, (stepId, status, detail) => {
+          if (status === "done") {
+            this.renderToolSubstep(stepEl, `${stepId} \u2014 ${detail}`, "done");
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+          }
+        });
+        this.lastObservedSignals = signals;
+        const summary = `Observed for ${dateStr}: ${signals.tasks.length} tasks, ${signals.feedback.length} feedback, ${signals.reflections.length} reflections, ${signals.vaultActivity.filesModified} files modified`;
+        this.completeToolStep(stepEl, summary);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+        return { result: summary };
+      }
+      case "run_assessment": {
+        if (!this.lastObservedSignals) {
+          return { result: "Error: No observed signals available. Call observe_signals first." };
+        }
+        const dateStr = toolInput.date || this.getLocalDateStr();
+        const stepEl = this.renderToolStep(messagesEl, "Running alignment assessment...");
+        const assessment = await this.agent.assessSignals(dateStr, this.lastObservedSignals);
+        this.completeToolStep(stepEl, `Score: ${assessment.overallScore}/100`);
+        await this.createCheckInNote(assessment);
+        this.renderCheckInLink(messagesEl, assessment);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+        const result = `Assessment complete. Score: ${assessment.overallScore}/100 (Day ${assessment.dayNumber}). Drift: ${assessment.driftIndicators.join("; ") || "None"}. Momentum: ${assessment.momentumIndicators.join("; ") || "None"}.`;
+        return { result, assessment };
+      }
+      case "save_conversation_summary": {
+        const dateStr = toolInput.date || this.getLocalDateStr();
+        const summary = toolInput.summary;
+        const overwrite = toolInput.overwrite;
+        if (!summary) {
+          return { result: "Error: No summary content provided." };
+        }
+        const folderPath = "NorthStar/check-ins";
+        const filePath = `${folderPath}/North Star Check-in \u2014 ${dateStr}.md`;
+        const existingFile = this.app.vault.getAbstractFileByPath(filePath);
+        if (existingFile && !overwrite) {
+          const currentContent = await this.app.vault.read(existingFile);
+          const marker = "## Conversation Notes";
+          const markerIdx = currentContent.indexOf(marker);
+          if (markerIdx >= 0) {
+            const existingSummary = currentContent.substring(markerIdx + marker.length).trim();
+            return {
+              result: `EXISTING CONVERSATION NOTES FOUND for ${dateStr}:
+
+${existingSummary}
+
+You must merge the old notes with the new conversation insights into a single unified summary. Call save_conversation_summary again with overwrite: true and a rewritten summary that incorporates BOTH the previous notes and the current conversation.`
+            };
+          }
+        }
+        const stepEl = this.renderToolStep(messagesEl, "Saving conversation notes...");
+        const summaryBlock = `
+
+---
+
+## Conversation Notes
+
+${summary}
+`;
+        if (existingFile) {
+          const currentContent = await this.app.vault.read(existingFile);
+          const marker = "## Conversation Notes";
+          const markerIdx = currentContent.indexOf(marker);
+          if (markerIdx >= 0) {
+            const beforeMarker = currentContent.lastIndexOf("---", markerIdx);
+            const trimPoint = beforeMarker >= 0 ? beforeMarker : markerIdx;
+            const updated = currentContent.substring(0, trimPoint).trimEnd() + summaryBlock;
+            await this.app.vault.modify(existingFile, updated);
+          } else {
+            await this.app.vault.modify(existingFile, currentContent.trimEnd() + summaryBlock);
+          }
+          this.completeToolStep(stepEl, "Updated check-in note with conversation notes");
+        } else {
+          if (!this.app.vault.getAbstractFileByPath(folderPath)) {
+            await this.app.vault.createFolder(folderPath);
+          }
+          const goal = this.manager.getGoal();
+          const goalText = goal ? goal.text : "No goal set";
+          const content = `**Goal:** ${goalText}
+${summaryBlock}`;
+          await this.app.vault.create(filePath, content);
+          this.completeToolStep(stepEl, "Created check-in note with conversation notes");
+        }
+        const latestAssessment = this.manager.getAssessments().find((a) => a.date === dateStr);
+        if (latestAssessment) {
+          this.renderCheckInLink(messagesEl, latestAssessment);
+        } else {
+          const notePath = filePath;
+          const link = messagesEl.createDiv({ cls: "acta-northstar-checkin-link" });
+          link.createEl("span", { cls: "acta-northstar-checkin-label", text: `Check-in \u2014 ${dateStr}` });
+          link.createEl("span", { cls: "acta-northstar-checkin-open", text: "Open note \u2197" });
+          link.addEventListener("click", () => {
+            this.app.workspace.openLinkText(notePath, "", false);
+          });
+        }
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+        return { result: `Conversation summary saved to check-in note for ${dateStr}.` };
+      }
+      case "get_assessment_history": {
+        const count = toolInput.count || 5;
+        const assessments = this.manager.getAssessments();
+        const recent = assessments.slice(-count);
+        if (recent.length === 0) {
+          return { result: "No assessment history available." };
+        }
+        const lines = recent.map(
+          (a) => `Day ${a.dayNumber} (${a.date}): ${a.overallScore}/100`
+        );
+        return { result: `Assessment history (last ${recent.length}):
+${lines.join("\n")}` };
+      }
+      default:
+        return { result: `Unknown tool: ${toolName}` };
+    }
+  }
+  // ── Agentic loop ──
+  async sendTinkerMessage(text, messagesEl, textarea, sendBtn) {
+    this.isSending = true;
+    textarea.disabled = true;
+    sendBtn.disabled = true;
+    sendBtn.addClass("is-disabled");
+    const userMsg = { role: "user", content: text, timestamp: Date.now() };
+    await this.manager.addTinkerMessage(userMsg);
+    this.appendMessageBubble(messagesEl, userMsg);
+    let typingEl = this.addTypingIndicator(messagesEl);
+    let producedAssessment = null;
+    try {
+      const systemPrompt = this.buildTinkerSystemPrompt();
+      const apiMessages = this.manager.getTinkerMessages().map((m) => ({
+        role: m.role,
+        content: m.content
+      }));
+      let maxIterations = 10;
+      while (maxIterations-- > 0) {
+        const response = await this.llmClient.chatWithTools(systemPrompt, apiMessages, TOOL_DEFINITIONS);
+        apiMessages.push({ role: "assistant", content: response.content });
+        if (response.stop_reason === "end_turn") {
+          const textParts = response.content.filter((b) => b.type === "text").map((b) => b.text);
+          const finalText = textParts.join("\n").trim();
+          typingEl.remove();
+          if (finalText) {
+            const assistantMsg = {
+              role: "assistant",
+              content: finalText,
+              timestamp: Date.now(),
+              assessmentId: producedAssessment == null ? void 0 : producedAssessment.id
+            };
+            await this.manager.addTinkerMessage(assistantMsg);
+            this.appendMessageBubble(messagesEl, assistantMsg);
+          }
+          break;
+        }
+        if (response.stop_reason === "tool_use") {
+          typingEl.remove();
+          const toolUseBlocks = response.content.filter(
+            (b) => b.type === "tool_use"
+          );
+          const toolResults = [];
+          for (const toolBlock of toolUseBlocks) {
+            try {
+              const { result, assessment } = await this.executeTool(
+                toolBlock.name,
+                toolBlock.input,
+                messagesEl
+              );
+              if (assessment) {
+                producedAssessment = assessment;
+              }
+              toolResults.push({
+                type: "tool_result",
+                tool_use_id: toolBlock.id,
+                content: result
+              });
+            } catch (e) {
+              const errorMsg = e instanceof Error ? e.message : "Unknown error";
+              toolResults.push({
+                type: "tool_result",
+                tool_use_id: toolBlock.id,
+                content: `Error: ${errorMsg}`,
+                is_error: true
+              });
+            }
+          }
+          apiMessages.push({ role: "user", content: toolResults });
+          typingEl = this.addTypingIndicator(messagesEl);
+          continue;
+        }
+        typingEl.remove();
+        break;
+      }
+    } catch (e) {
+      typingEl.remove();
+      const errorMsg = e instanceof Error ? e.message : "Unknown error";
+      const errorEl = messagesEl.createDiv({ cls: "acta-northstar-tinker-error" });
+      errorEl.textContent = `Error: ${errorMsg}`;
+    }
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    this.isSending = false;
+    textarea.disabled = false;
+    sendBtn.disabled = false;
+    sendBtn.removeClass("is-disabled");
+    textarea.focus();
+  }
+  buildTinkerSystemPrompt() {
+    const goal = this.manager.getGoal();
+    if (!goal)
+      return "No active goal.";
+    const dayNumber = this.manager.getDayNumber();
+    const daysLeft = this.manager.getDaysLeft();
+    const latest = this.manager.getLatestAssessment();
+    let assessmentBlock = "No assessment yet.";
+    if (latest) {
+      const breakdownLines = latest.signalBreakdown.map(
+        (s) => `- ${this.formatCategoryName(s.category)}: ${Math.round(s.score)}/${Math.round(s.maxScore)} \u2014 ${s.reasoning}`
+      ).join("\n");
+      const driftLines = latest.driftIndicators.length > 0 ? latest.driftIndicators.map((d) => `- ${d}`).join("\n") : "- None";
+      const momentumLines = latest.momentumIndicators.length > 0 ? latest.momentumIndicators.map((m) => `- ${m}`).join("\n") : "- None";
+      assessmentBlock = `Score: ${latest.overallScore}/100 (Day ${latest.dayNumber}, ${latest.date})
+Signal Breakdown:
+${breakdownLines}
+Drift:
+${driftLines}
+Momentum:
+${momentumLines}`;
+    }
+    return `You are Tinker, a goal-alignment coach embedded in North Star.
+
+## Your Role
+- Challenge assumptions, surface patterns, pressure-test decisions
+- Be direct and specific \u2014 reference actual tasks, scores, and signals
+- Push back when the user rationalizes drift
+- You are NOT a general-purpose assistant. Stay focused on the goal.
+
+## Tools Available
+When the user asks for a "check-in", "how am I doing", "run a cycle", or similar:
+1. First call get_today_date to get today's date and check if a check-in exists
+2. Then call observe_signals with that date to collect data
+3. Then call run_assessment with that date to score alignment (this updates any existing check-in in place)
+4. Then provide your commentary and coaching
+
+IMPORTANT: Always call get_today_date first and pass its date to the other tools. This ensures consistent dates and proper updates. If a check-in already exists for today, tell the user you're updating it.
+
+Use get_assessment_history when the user asks about trends or progress over time.
+
+When the user asks to "summarize", "save notes", "capture takeaways", or similar:
+1. Call get_today_date first if you haven't already
+2. Call save_conversation_summary with a markdown summary of the conversation \u2014 include key insights, action items, and decisions
+3. The summary will be appended to that day's check-in note
+
+IMPORTANT for save_conversation_summary:
+- Write the summary in the SAME language(s) the conversation used. If the user spoke in Chinese, summarize in Chinese. If mixed (e.g. Chinese + English), keep that mix. Preserve the original voice and expressions \u2014 do not translate.
+- Do NOT include a title/heading in the summary \u2014 the "## Conversation Notes" heading is added automatically. Start directly with the content (e.g. bullet points, sections with ### subheadings).
+
+Do NOT call tools unless the conversation warrants it. For regular coaching questions, just respond with text.
+
+## Current Context
+Goal: "${goal.text}"
+Day ${dayNumber} of ${goal.timeWindowDays} | Phase: ${goal.currentPhase} | ${daysLeft}d left
+
+## Latest Assessment
+${assessmentBlock}
+
+## What Tinker never does
+- No file/vault operations
+- No general Q&A unrelated to the goal
+- No flattery or empty encouragement`;
   }
 };
 
@@ -1790,7 +2119,8 @@ var DEFAULT_NORTHSTAR_DATA = {
   goal: null,
   policy: { ...DEFAULT_POLICY, signalWeights: { ...DEFAULT_SIGNAL_WEIGHTS }, milestones: [] },
   assessments: [],
-  archivedGoals: []
+  archivedGoals: [],
+  tinkerMessages: []
 };
 var TIME_ANNOTATION_REGEX = /@(\d{1,2}(?::?\d{2})?)\s*(?:AM|PM|am|pm)?\s*[-–]\s*(\d{1,2}(?::?\d{2})?)\s*(?:AM|PM|am|pm)?/;
 
@@ -1860,6 +2190,7 @@ var NorthStarManager = class {
       version: 1
     };
     this.data.assessments = [];
+    this.data.tinkerMessages = [];
     await this.saveData();
     return goal;
   }
@@ -1881,7 +2212,19 @@ var NorthStarManager = class {
     this.data.archivedGoals.push(this.data.goal);
     this.data.goal = null;
     this.data.assessments = [];
+    this.data.tinkerMessages = [];
     this.data.policy = { ...DEFAULT_POLICY, signalWeights: { ...DEFAULT_SIGNAL_WEIGHTS }, milestones: [] };
+    await this.saveData();
+  }
+  getTinkerMessages() {
+    return this.data.tinkerMessages;
+  }
+  async addTinkerMessage(msg) {
+    this.data.tinkerMessages.push(msg);
+    await this.saveData();
+  }
+  async clearTinkerMessages() {
+    this.data.tinkerMessages = [];
     await this.saveData();
   }
 };
@@ -1894,6 +2237,83 @@ var NorthStarLlmClient = class {
   }
   updateSettings(settings) {
     this.settings = settings;
+  }
+  async chat(systemPrompt, messages) {
+    const apiKey = this.settings.anthropicApiKey;
+    if (!apiKey) {
+      throw new Error("Anthropic API key not set. Go to Settings \u2192 Acta Task \u2192 North Star to add it.");
+    }
+    let response;
+    try {
+      response = await (0, import_obsidian11.requestUrl)({
+        url: "https://api.anthropic.com/v1/messages",
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01"
+        },
+        body: JSON.stringify({
+          model: this.settings.northStarModel,
+          max_tokens: 4096,
+          system: systemPrompt,
+          messages: messages.map((m) => ({ role: m.role, content: m.content }))
+        }),
+        throw: false
+      });
+    } catch (e) {
+      throw new Error(`Network error: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    if (response.status === 401) {
+      throw new Error("Invalid API key. Check your key in Settings \u2192 Acta Task \u2192 North Star.");
+    }
+    if (response.status !== 200) {
+      throw new Error(`API error (${response.status}): ${response.text}`);
+    }
+    const data = response.json;
+    if (data.content && data.content.length > 0 && data.content[0].type === "text") {
+      return data.content[0].text;
+    }
+    throw new Error("Unexpected API response format");
+  }
+  async chatWithTools(systemPrompt, messages, tools) {
+    const apiKey = this.settings.anthropicApiKey;
+    if (!apiKey) {
+      throw new Error("Anthropic API key not set. Go to Settings \u2192 Acta Task \u2192 North Star to add it.");
+    }
+    let response;
+    try {
+      response = await (0, import_obsidian11.requestUrl)({
+        url: "https://api.anthropic.com/v1/messages",
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01"
+        },
+        body: JSON.stringify({
+          model: this.settings.northStarModel,
+          max_tokens: 4096,
+          system: systemPrompt,
+          messages: messages.map((m) => ({ role: m.role, content: m.content })),
+          tools
+        }),
+        throw: false
+      });
+    } catch (e) {
+      throw new Error(`Network error: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    if (response.status === 401) {
+      throw new Error("Invalid API key. Check your key in Settings \u2192 Acta Task \u2192 North Star.");
+    }
+    if (response.status !== 200) {
+      throw new Error(`API error (${response.status}): ${response.text}`);
+    }
+    const data = response.json;
+    return {
+      content: data.content || [],
+      stop_reason: data.stop_reason || "end_turn"
+    };
   }
   async call(systemPrompt, userMessage) {
     const apiKey = this.settings.anthropicApiKey;
@@ -2097,6 +2517,22 @@ var NorthStarAgent = class {
     this.manager = manager;
     this.observer = observer;
     this.llmClient = llmClient;
+  }
+  async observeSignals(dateStr, onProgress) {
+    return this.observer.observe(dateStr, (step, detail) => {
+      const isRunning = detail.startsWith("Scanning") || detail.startsWith("Checking");
+      onProgress == null ? void 0 : onProgress(step, isRunning ? "running" : "done", detail);
+    });
+  }
+  async assessSignals(dateStr, signals) {
+    const goal = this.manager.getGoal();
+    if (!goal)
+      throw new Error("No active goal set");
+    const policy = this.manager.getPolicy();
+    const dayNumber = this.manager.getDayNumber();
+    const assessment = await this.assess(goal, signals, policy, dayNumber, dateStr);
+    await this.manager.addAssessment(assessment);
+    return assessment;
   }
   async runCycle(dateStr, onProgress) {
     const goal = this.manager.getGoal();
@@ -2322,6 +2758,7 @@ var ActaTaskPlugin = class extends import_obsidian12.Plugin {
         leaf,
         this.northStarManager,
         this.northStarAgent,
+        this.northStarLlmClient,
         this.settings
       );
     });
@@ -2500,6 +2937,9 @@ var ActaTaskPlugin = class extends import_obsidian12.Plugin {
     }
     if (!this.northStarData.archivedGoals) {
       this.northStarData.archivedGoals = [];
+    }
+    if (!this.northStarData.tinkerMessages) {
+      this.northStarData.tinkerMessages = [];
     }
   }
   async saveNorthStarData() {

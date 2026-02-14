@@ -5,6 +5,7 @@ import {
 	NorthStarGoal,
 	NorthStarPolicy,
 	Assessment,
+	TinkerMessage,
 	DEFAULT_SIGNAL_WEIGHTS,
 	DEFAULT_POLICY,
 } from "./northStarTypes";
@@ -83,6 +84,7 @@ export class NorthStarManager {
 			version: 1,
 		};
 		this.data.assessments = [];
+		this.data.tinkerMessages = [];
 
 		await this.saveData();
 		return goal;
@@ -107,7 +109,22 @@ export class NorthStarManager {
 		this.data.archivedGoals.push(this.data.goal);
 		this.data.goal = null;
 		this.data.assessments = [];
+		this.data.tinkerMessages = [];
 		this.data.policy = { ...DEFAULT_POLICY, signalWeights: { ...DEFAULT_SIGNAL_WEIGHTS }, milestones: [] };
+		await this.saveData();
+	}
+
+	getTinkerMessages(): TinkerMessage[] {
+		return this.data.tinkerMessages;
+	}
+
+	async addTinkerMessage(msg: TinkerMessage): Promise<void> {
+		this.data.tinkerMessages.push(msg);
+		await this.saveData();
+	}
+
+	async clearTinkerMessages(): Promise<void> {
+		this.data.tinkerMessages = [];
 		await this.saveData();
 	}
 }
