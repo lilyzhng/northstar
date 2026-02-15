@@ -52,7 +52,7 @@ export const DEFAULT_DATA: ActaTaskData = {
 	addedTasks: {},
 };
 
-export const ACTA_TASK_VIEW_TYPE = "acta-task-board";
+export const ACTA_TASK_VIEW_TYPE = "northstar-board";
 
 // Feedback types
 export interface FeedbackItem {

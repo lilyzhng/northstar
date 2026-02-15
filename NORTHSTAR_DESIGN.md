@@ -2,7 +2,7 @@
 
 ## What Is It
 
-North Star is the 4th board in Acta-Task. The other three boards are passive records — you write tasks, log feedback. North Star is different: it's an **active agent** that watches what you do, tells you whether you're converging on your goal, and evolves how it measures you over time.
+North Star is the 4th board in Northstar. The other three boards are passive records — you write tasks, log feedback. North Star is different: it's an **active agent** that watches what you do, tells you whether you're converging on your goal, and evolves how it measures you over time.
 
 You set a goal. You lock it in. Then you just work — write notes, complete tasks, log feedback like you normally do. North Star reads all of that and tells you: "Here's how aligned your day was. Here's where you're drifting. Here's what to think about tomorrow."
 
@@ -320,7 +320,7 @@ It starts as a pure Tinker and grows into an executor as the product matures.
 - Adjust signal weights or phase — "You're right, I'm past exploration" → phase transition applied
 - Trigger a new assessment cycle — "Let's re-evaluate after this conversation"
 
-The boundary: The Tinker executes within the Acta-Task system (milestones, tasks, policy, feedback). It doesn't become a general-purpose vault editor or file manager — that's Claudian's territory. The Tinker acts on *decisions about the goal*, not on arbitrary vault operations.
+The boundary: The Tinker executes within the Northstar system (milestones, tasks, policy, feedback). It doesn't become a general-purpose vault editor or file manager — that's Claudian's territory. The Tinker acts on *decisions about the goal*, not on arbitrary vault operations.
 
 ### Conversations as signal
 
@@ -341,7 +341,7 @@ The conversation is persistent within a goal window. You can scroll back through
 - No general vault file writing or editing — that's Claudian
 - No vault commands, bash, or search
 - No general Q&A unrelated to the goal
-- No action outside the Acta-Task system boundary
+- No action outside the Northstar system boundary
 
 ## Open Questions
 

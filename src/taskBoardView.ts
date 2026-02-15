@@ -31,7 +31,7 @@ export class TaskBoardView extends ItemView {
 	}
 
 	getDisplayText(): string {
-		return "Acta Task Board";
+		return "Northstar Board";
 	}
 
 	getIcon(): string {
@@ -41,9 +41,9 @@ export class TaskBoardView extends ItemView {
 	async onOpen(): Promise<void> {
 		const container = this.containerEl.children[1];
 		container.empty();
-		container.addClass("acta-task-container");
+		container.addClass("northstar-container");
 
-		this.boardEl = container.createDiv({ cls: "acta-task-board" });
+		this.boardEl = container.createDiv({ cls: "northstar-board" });
 
 		await this.refresh();
 		this.registerEvents();
@@ -88,12 +88,12 @@ export class TaskBoardView extends ItemView {
 		this.boardEl.empty();
 
 		// Header
-		const header = this.boardEl.createDiv({ cls: "acta-task-header" });
-		const titleRow = header.createDiv({ cls: "acta-task-title-row" });
+		const header = this.boardEl.createDiv({ cls: "northstar-header" });
+		const titleRow = header.createDiv({ cls: "northstar-title-row" });
 		titleRow.createEl("h4", { text: "Task Board" });
 
 		const refreshBtn = titleRow.createEl("button", {
-			cls: "acta-task-refresh-btn clickable-icon",
+			cls: "northstar-refresh-btn clickable-icon",
 			attr: { "aria-label": "Refresh" },
 		});
 		refreshBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`;
@@ -106,20 +106,20 @@ export class TaskBoardView extends ItemView {
 			0
 		);
 		header.createDiv({
-			cls: "acta-task-stats",
+			cls: "northstar-stats",
 			text: `${completedTasks}/${totalTasks} done across ${topics.length} topics`,
 		});
 
 		if (topics.length === 0) {
 			this.boardEl.createDiv({
-				cls: "acta-task-empty",
+				cls: "northstar-empty",
 				text: "No tasks yet. Add checkboxes with inline hashtags (e.g. - [ ] #people do something) to see them here.",
 			});
 			return;
 		}
 
 		// Topic sections
-		const list = this.boardEl.createDiv({ cls: "acta-task-topics" });
+		const list = this.boardEl.createDiv({ cls: "northstar-topics" });
 		for (const topic of topics) {
 			this.renderTopicSection(list, topic);
 		}
@@ -129,26 +129,26 @@ export class TaskBoardView extends ItemView {
 		parent: HTMLElement,
 		topic: TopicGroup
 	): void {
-		const section = parent.createDiv({ cls: "acta-task-topic-section" });
+		const section = parent.createDiv({ cls: "northstar-topic-section" });
 		const isCollapsed = this.collapsedTopics.has(topic.tag);
 
 		// Topic header
 		const topicHeader = section.createDiv({
-			cls: "acta-task-topic-header",
+			cls: "northstar-topic-header",
 		});
 
 		const chevron = topicHeader.createSpan({
-			cls: `acta-task-chevron ${isCollapsed ? "is-collapsed" : ""}`,
+			cls: `northstar-chevron ${isCollapsed ? "is-collapsed" : ""}`,
 		});
 		chevron.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
 
 		topicHeader.createSpan({
-			cls: "acta-task-topic-tag",
+			cls: "northstar-topic-tag",
 			text: `#${topic.displayTag}`,
 		});
 
 		topicHeader.createSpan({
-			cls: "acta-task-topic-count",
+			cls: "northstar-topic-count",
 			text: `${topic.completedCount}/${topic.totalCount}`,
 		});
 
@@ -163,7 +163,7 @@ export class TaskBoardView extends ItemView {
 
 		// Task list (hidden if collapsed)
 		if (!isCollapsed) {
-			const taskList = section.createDiv({ cls: "acta-task-list" });
+			const taskList = section.createDiv({ cls: "northstar-list" });
 
 			for (const task of topic.tasks) {
 				if (!this.settings.showCompleted && task.completed) continue;
@@ -177,12 +177,12 @@ export class TaskBoardView extends ItemView {
 		task: { id: string; text: string; completed: boolean; filePath: string; fileName: string; line: number; addedAt: number }
 	): void {
 		const item = parent.createDiv({
-			cls: `acta-task-item ${task.completed ? "is-completed" : ""}`,
+			cls: `northstar-item ${task.completed ? "is-completed" : ""}`,
 		});
 
 		const checkbox = item.createEl("input", {
 			type: "checkbox",
-			cls: "acta-task-checkbox task-list-item-checkbox",
+			cls: "northstar-checkbox task-list-item-checkbox",
 		});
 		(checkbox as HTMLInputElement).checked = task.completed;
 
@@ -190,23 +190,23 @@ export class TaskBoardView extends ItemView {
 			e.preventDefault();
 			const success = await this.toggler.toggleTask(task);
 			if (!success) {
-				console.error("Acta Task: Failed to toggle task", task.id);
+				console.error("Northstar: Failed to toggle task", task.id);
 			}
 			// The vault.modify will trigger metadataCache changed → debounced refresh
 		});
 
 		item.createSpan({
-			cls: "acta-task-text",
+			cls: "northstar-text",
 			text: task.text,
 		});
 
 		if (this.settings.showSourceNote) {
 			const metaContainer = item.createSpan({
-				cls: "acta-task-meta",
+				cls: "northstar-meta",
 			});
 
 			const badge = metaContainer.createSpan({
-				cls: "acta-task-source-badge",
+				cls: "northstar-source-badge",
 				text: task.fileName,
 			});
 			badge.addEventListener("click", async (e) => {
@@ -228,14 +228,14 @@ export class TaskBoardView extends ItemView {
 				day: "numeric",
 			});
 			metaContainer.createSpan({
-				cls: "acta-task-date-badge",
+				cls: "northstar-date-badge",
 				text: dateStr,
 			});
 		}
 
 		// Remove button
 		const removeBtn = item.createSpan({
-			cls: "acta-task-remove-btn",
+			cls: "northstar-remove-btn",
 			text: "×",
 			attr: { title: "Remove from board" },
 		});

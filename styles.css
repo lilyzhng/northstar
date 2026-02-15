@@ -1,34 +1,34 @@
-.acta-task-container {
+.northstar-container {
 	padding: 0;
 	overflow-y: hidden;
 	height: 100%;
 }
 
-.acta-task-board {
+.northstar-board {
 	padding: 12px;
 }
 
 /* Header */
-.acta-task-header {
+.northstar-header {
 	margin-bottom: 12px;
 	padding-bottom: 8px;
 	border-bottom: 1px solid var(--background-modifier-border);
 }
 
-.acta-task-title-row {
+.northstar-title-row {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 }
 
-.acta-task-title-row h4 {
+.northstar-title-row h4 {
 	margin: 0;
 	font-size: 1em;
 	font-weight: 600;
 	color: var(--text-normal);
 }
 
-.acta-task-refresh-btn {
+.northstar-refresh-btn {
 	background: none;
 	border: none;
 	cursor: pointer;
@@ -39,19 +39,19 @@
 	align-items: center;
 }
 
-.acta-task-refresh-btn:hover {
+.northstar-refresh-btn:hover {
 	color: var(--text-normal);
 	background: var(--background-modifier-hover);
 }
 
-.acta-task-stats {
+.northstar-stats {
 	font-size: 0.8em;
 	color: var(--text-muted);
 	margin-top: 4px;
 }
 
 /* Empty state */
-.acta-task-empty {
+.northstar-empty {
 	color: var(--text-muted);
 	font-size: 0.85em;
 	text-align: center;
@@ -60,19 +60,19 @@
 }
 
 /* Topic sections */
-.acta-task-topics {
+.northstar-topics {
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
 }
 
-.acta-task-topic-section {
+.northstar-topic-section {
 	border-radius: 6px;
 	background: var(--background-secondary);
 	overflow: hidden;
 }
 
-.acta-task-topic-header {
+.northstar-topic-header {
 	display: flex;
 	align-items: center;
 	gap: 6px;
@@ -85,29 +85,29 @@
 	background: var(--background-secondary);
 }
 
-.acta-task-topic-header:hover {
+.northstar-topic-header:hover {
 	background: var(--background-modifier-hover);
 }
 
-.acta-task-chevron {
+.northstar-chevron {
 	display: flex;
 	align-items: center;
 	transition: transform 150ms ease;
 	color: var(--text-muted);
 }
 
-.acta-task-chevron.is-collapsed {
+.northstar-chevron.is-collapsed {
 	transform: rotate(-90deg);
 }
 
-.acta-task-topic-tag {
+.northstar-topic-tag {
 	font-weight: 600;
 	font-size: 0.9em;
 	color: var(--text-accent);
 	flex: 1;
 }
 
-.acta-task-topic-count {
+.northstar-topic-count {
 	font-size: 0.75em;
 	color: var(--text-muted);
 	background: var(--background-primary);
@@ -116,11 +116,11 @@
 }
 
 /* Task list */
-.acta-task-list {
+.northstar-list {
 	padding: 2px 0 6px 0;
 }
 
-.acta-task-item {
+.northstar-item {
 	display: flex;
 	align-items: flex-start;
 	gap: 6px;
@@ -129,29 +129,29 @@
 	line-height: 1.4;
 }
 
-.acta-task-item:hover {
+.northstar-item:hover {
 	background: var(--background-modifier-hover);
 }
 
-.acta-task-item.is-completed .acta-task-text {
+.northstar-item.is-completed .northstar-text {
 	text-decoration: line-through;
 	opacity: 0.5;
 	color: var(--text-muted);
 }
 
-.acta-task-checkbox {
+.northstar-checkbox {
 	margin-top: 2px;
 	flex-shrink: 0;
 	cursor: pointer;
 }
 
-.acta-task-text {
+.northstar-text {
 	flex: 1;
 	color: var(--text-normal);
 	word-break: break-word;
 }
 
-.acta-task-meta {
+.northstar-meta {
 	display: flex;
 	flex-direction: column;
 	align-items: flex-end;
@@ -159,7 +159,7 @@
 	flex-shrink: 0;
 }
 
-.acta-task-source-badge {
+.northstar-source-badge {
 	font-size: 0.75em;
 	color: var(--text-muted);
 	background: var(--background-primary);
@@ -169,18 +169,18 @@
 	white-space: nowrap;
 }
 
-.acta-task-source-badge:hover {
+.northstar-source-badge:hover {
 	color: var(--text-accent);
 	background: var(--background-modifier-hover);
 }
 
-.acta-task-date-badge {
+.northstar-date-badge {
 	font-size: 0.7em;
 	color: var(--text-faint);
 	white-space: nowrap;
 }
 
-.acta-task-remove-btn {
+.northstar-remove-btn {
 	flex-shrink: 0;
 	font-size: 1.2em;
 	color: var(--text-muted);
@@ -191,13 +191,13 @@
 	user-select: none;
 }
 
-.acta-task-remove-btn:hover {
+.northstar-remove-btn:hover {
 	color: var(--text-error);
 	background: var(--background-modifier-error);
 }
 
 /* Editor "+" button */
-.acta-task-add-button {
+.northstar-add-button {
 	display: inline-block;
 	margin-left: 8px;
 	padding: 1px 6px;
@@ -212,17 +212,17 @@
 	transition: opacity 150ms ease;
 }
 
-.acta-task-add-button:hover {
+.northstar-add-button:hover {
 	opacity: 1;
 }
 
 /* Feedback-specific styles */
 .acta-feedback-item {
-	/* Inherits from .acta-task-item */
+	/* Inherits from .northstar-item */
 }
 
 .acta-feedback-text {
-	/* Inherits from .acta-task-text */
+	/* Inherits from .northstar-text */
 }
 
 /* Negative Feedback Board specific styles */
@@ -230,7 +230,7 @@
 	/* Optional: Add a subtle indicator for negative feedback board */
 }
 
-.acta-negative-feedback-board .acta-task-header {
+.acta-negative-feedback-board .northstar-header {
 	/* Subtle color difference for negative feedback board header */
 	border-bottom-color: var(--background-modifier-border-hover);
 }
@@ -246,7 +246,7 @@
 }
 
 /* Optional: Different accent color for negative feedback topics */
-.acta-negative-feedback-board .acta-task-topic-tag {
+.acta-negative-feedback-board .northstar-topic-tag {
 	color: var(--text-normal);
 	opacity: 0.9;
 }
@@ -337,13 +337,102 @@
 	margin-top: 8px;
 }
 
+/* Goals section */
+.acta-northstar-goals-section {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin-bottom: 12px;
+}
+
+/* Add goal button */
+.acta-northstar-add-goal-btn {
+	width: 36px;
+	height: 36px;
+	border: 2px dashed var(--background-modifier-border);
+	border-radius: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 1.2em;
+	color: var(--text-muted);
+	cursor: pointer;
+	transition: border-color 150ms ease, color 150ms ease, background 150ms ease;
+	align-self: center;
+	margin-top: 4px;
+}
+
+.acta-northstar-add-goal-btn:hover {
+	border-color: var(--text-accent);
+	color: var(--text-accent);
+	background: var(--background-modifier-hover);
+}
+
 /* Goal card */
 .acta-northstar-goal-card {
 	border-left: 3px solid var(--text-accent);
 	background: var(--background-secondary);
 	border-radius: 6px;
 	padding: 12px;
-	margin-bottom: 12px;
+	cursor: pointer;
+	transition: border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.acta-northstar-goal-card.is-active {
+	border-left-color: var(--text-accent);
+}
+
+/* Carousel */
+.acta-northstar-goal-carousel {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.acta-northstar-carousel-card-wrapper {
+	flex: 1;
+	min-width: 0;
+}
+
+.acta-northstar-carousel-arrow {
+	background: none;
+	border: none;
+	cursor: pointer;
+	color: var(--text-muted);
+	font-size: 1.5em;
+	padding: 4px;
+	opacity: 0.6;
+	flex-shrink: 0;
+	line-height: 1;
+}
+
+.acta-northstar-carousel-arrow:hover {
+	opacity: 1;
+}
+
+.acta-northstar-carousel-arrow:disabled {
+	opacity: 0.2;
+	cursor: default;
+}
+
+.acta-northstar-carousel-dots {
+	display: flex;
+	justify-content: center;
+	gap: 6px;
+	margin-top: 6px;
+}
+
+.acta-northstar-carousel-dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--background-modifier-border);
+	cursor: pointer;
+	transition: background 0.15s ease;
+}
+
+.acta-northstar-carousel-dot.is-active {
+	background: var(--text-accent);
 }
 
 .acta-northstar-goal-text {
@@ -352,6 +441,20 @@
 	color: var(--text-normal);
 	margin-bottom: 8px;
 	line-height: 1.4;
+}
+
+.acta-northstar-goal-context-link {
+	display: inline;
+	font-size: 0.75em;
+	font-weight: 400;
+	color: var(--text-faint);
+	cursor: pointer;
+	vertical-align: baseline;
+}
+
+.acta-northstar-goal-context-link:hover {
+	color: var(--text-accent);
+	text-decoration: underline;
 }
 
 .acta-northstar-goal-badges {
@@ -919,6 +1022,109 @@
 @keyframes acta-northstar-tinker-bounce {
 	0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
 	30% { transform: translateY(-4px); opacity: 1; }
+}
+
+/* ========== @ Mention Dropdown ========== */
+
+.acta-northstar-mention-dropdown {
+	position: absolute;
+	bottom: 100%;
+	left: 0;
+	right: 0;
+	max-height: 200px;
+	overflow-y: auto;
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15);
+	z-index: 1000;
+	margin-bottom: 4px;
+}
+
+.acta-northstar-mention-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 10px;
+	cursor: pointer;
+	font-size: 0.85em;
+	transition: background 0.1s ease;
+}
+
+.acta-northstar-mention-item:hover,
+.acta-northstar-mention-item.is-selected {
+	background: var(--background-modifier-hover);
+}
+
+.acta-northstar-mention-item.is-selected {
+	background: rgba(var(--interactive-accent-rgb, 58, 135, 209), 0.15);
+}
+
+.acta-northstar-mention-name {
+	font-weight: 500;
+	color: var(--text-normal);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.acta-northstar-mention-path {
+	font-size: 0.85em;
+	color: var(--text-faint);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	margin-left: auto;
+}
+
+/* ========== File Chips (input area) ========== */
+
+.acta-northstar-file-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	padding: 4px 10px;
+}
+
+.acta-northstar-file-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 2px 8px;
+	border-radius: 4px;
+	font-size: 0.8em;
+	background: rgba(var(--interactive-accent-rgb, 58, 135, 209), 0.12);
+	color: var(--interactive-accent);
+}
+
+.acta-northstar-file-chip-remove {
+	cursor: pointer;
+	font-size: 1.1em;
+	line-height: 1;
+	opacity: 0.6;
+	transition: opacity 0.15s ease;
+}
+
+.acta-northstar-file-chip-remove:hover {
+	opacity: 1;
+}
+
+/* ========== Bubble Reference Chips ========== */
+
+.acta-northstar-bubble-refs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin-bottom: 6px;
+}
+
+.acta-northstar-bubble-ref-chip {
+	display: inline-block;
+	font-size: 0.75em;
+	padding: 1px 6px;
+	border-radius: 3px;
+	background: rgba(var(--interactive-accent-rgb, 58, 135, 209), 0.1);
+	color: var(--text-accent);
 }
 
 /* Error message */

@@ -13,7 +13,7 @@ export class ActaTaskSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		containerEl.createEl("h2", { text: "Acta Task Settings" });
+		containerEl.createEl("h2", { text: "Northstar Settings" });
 
 		containerEl.createEl("p", {
 			text: "Tasks with inline hashtags (e.g. - [ ] #people do something) are automatically tracked on the board.",

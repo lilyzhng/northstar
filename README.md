@@ -1,4 +1,4 @@
-# Acta Task - Inline Tag Task Board
+# Northstar - Inline Tag Task Board
 
 An Obsidian plugin that automatically tracks tasks with **inline hashtags** in a sidebar board.
 

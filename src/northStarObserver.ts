@@ -35,11 +35,11 @@ export class NorthStarObserver {
 	}
 
 	async observe(dateStr: string, onStep?: ObserveStepCallback): Promise<DaySignals> {
-		onStep?.("tasks", "Scanning task board...");
-		const tasks = this.extractTaskSignals(dateStr);
+		onStep?.("tasks", "Scanning daily note for priority actions...");
+		const tasks = await this.extractPriorityTasksFromNote(dateStr);
 		const completedCount = tasks.filter(t => t.completed).length;
 		const deepWorkCount = tasks.filter(t => t.effort === "deep_work").length;
-		onStep?.("tasks", `Found ${tasks.length} tasks (${completedCount} completed, ${deepWorkCount} deep work)`);
+		onStep?.("tasks", `Found ${tasks.length} priority actions (${completedCount} completed, ${deepWorkCount} deep work)`);
 
 		onStep?.("positive-feedback", "Scanning positive feedback...");
 		const positiveFeedback = this.extractPositiveFeedbackSignals(dateStr);
@@ -68,30 +68,79 @@ export class NorthStarObserver {
 		};
 	}
 
-	private extractTaskSignals(dateStr: string): TaskSignal[] {
+	/**
+	 * Read priority tasks directly from the daily note's "Today's Priority Actions" section.
+	 * This is the single source of truth — no task board indirection.
+	 */
+	private async extractPriorityTasksFromNote(dateStr: string): Promise<TaskSignal[]> {
 		const signals: TaskSignal[] = [];
 		const compactDate = dateStr.replace(/-/g, "");
+		const files = this.app.vault.getMarkdownFiles();
 
-		for (const task of Object.values(this.taskData.addedTasks)) {
-			if (!task.filePath.includes(compactDate)) continue;
+		for (const file of files) {
+			if (!file.path.includes(compactDate)) continue;
 
-			const timeMatch = task.text.match(TIME_ANNOTATION_REGEX);
-			let durationMin: number | undefined;
-			let timeAnnotation: string | undefined;
+			const content = await this.app.vault.cachedRead(file);
+			const lines = content.split("\n");
 
-			if (timeMatch) {
-				timeAnnotation = timeMatch[0];
-				durationMin = this.parseDuration(timeMatch[1], timeMatch[2]);
+			let inPrioritySection = false;
+			for (const line of lines) {
+				// Detect "Today's Priority Actions" heading (any heading level)
+				if (/^#{1,6}\s+Today'?s?\s+Priority\s+Actions/i.test(line)) {
+					inPrioritySection = true;
+					continue;
+				}
+
+				// Exit section on next heading
+				if (inPrioritySection && /^#{1,6}\s+/.test(line)) {
+					break;
+				}
+
+				// Parse each checkbox line in the priority section
+				if (inPrioritySection) {
+					const checkboxMatch = line.match(/^\s*-\s+\[([ xX])\]\s+(.*)/i);
+					if (checkboxMatch) {
+						const completed = checkboxMatch[1].toLowerCase() === "x";
+						const fullText = checkboxMatch[2];
+
+						// Extract time annotation
+						const timeMatch = fullText.match(TIME_ANNOTATION_REGEX);
+						let timeAnnotation: string | undefined;
+						let durationMin: number | undefined;
+						if (timeMatch) {
+							timeAnnotation = timeMatch[0];
+							durationMin = this.parseDuration(timeMatch[1], timeMatch[2]);
+						}
+
+						// Extract tags
+						const tags: string[] = [];
+						const tagMatches = fullText.matchAll(/#(\w+)/g);
+						for (const m of tagMatches) {
+							tags.push(`#${m[1]}`);
+						}
+
+						// Clean title: remove tags, time annotations, links
+						const title = fullText
+							.replace(TIME_ANNOTATION_REGEX, "")
+							.replace(/\[\[.*?\]\]/g, "")
+							.replace(/\[.*?\]\(.*?\)/g, "")
+							.replace(/\s+/g, " ")
+							.trim();
+
+						if (title.length > 0) {
+							signals.push({
+								title,
+								tags,
+								completed,
+								timeAnnotation,
+								durationMin,
+								effort: timeMatch ? "deep_work" : "quick_action",
+								priority: true,
+							});
+						}
+					}
+				}
 			}
-
-			signals.push({
-				title: task.text,
-				tags: task.tags,
-				completed: task.completed,
-				timeAnnotation,
-				durationMin,
-				effort: timeMatch ? "deep_work" : "quick_action",
-			});
 		}
 
 		return signals;
@@ -158,11 +207,39 @@ export class NorthStarObserver {
 			const content = await this.app.vault.cachedRead(file);
 			const lines = content.split("\n");
 
+			// Pick up lines tagged with #northstar anywhere in the note
 			for (const line of lines) {
 				if (line.toLowerCase().includes("#northstar")) {
 					const cleanText = line
 						.replace(/^[\s]*[-*]\s+/, "")
 						.replace(/#northstar/gi, "")
+						.trim();
+					if (cleanText.length > 0) {
+						reflections.push({
+							text: cleanText,
+							filePath: file.path,
+						});
+					}
+				}
+			}
+
+			// Also pick up content under a "Reflection" heading section
+			let inReflectionSection = false;
+			for (const line of lines) {
+				if (/^#{1,6}\s+Reflection/i.test(line)) {
+					inReflectionSection = true;
+					continue;
+				}
+
+				// Exit on next heading
+				if (inReflectionSection && /^#{1,6}\s+/.test(line)) {
+					break;
+				}
+
+				if (inReflectionSection) {
+					const cleanText = line
+						.replace(/^[\s]*[-*]\s+/, "")
+						.replace(/#\w+/g, "")
 						.trim();
 					if (cleanText.length > 0) {
 						reflections.push({

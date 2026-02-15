@@ -4,11 +4,14 @@ import {
 	ActaNorthStarData,
 	NorthStarGoal,
 	NorthStarPolicy,
+	GoalContext,
 	Assessment,
 	TinkerMessage,
 	DEFAULT_SIGNAL_WEIGHTS,
 	DEFAULT_POLICY,
 } from "./northStarTypes";
+
+const MAX_GOALS = 2;
 
 export class NorthStarManager {
 	constructor(
@@ -16,7 +19,9 @@ export class NorthStarManager {
 		private settings: ActaTaskSettings,
 		private data: ActaNorthStarData,
 		private saveData: () => Promise<void>
-	) {}
+	) {
+		this.migrateTinkerMessages();
+	}
 
 	updateSettings(settings: ActaTaskSettings): void {
 		this.settings = settings;
@@ -24,29 +29,77 @@ export class NorthStarManager {
 
 	updateData(data: ActaNorthStarData): void {
 		this.data = data;
+		this.migrateTinkerMessages();
 	}
 
-	getGoal(): NorthStarGoal | null {
-		return this.data.goal;
+	/** Migrate legacy shared tinkerMessages into the first goal context */
+	private migrateTinkerMessages(): void {
+		// Ensure every goal context has a tinkerMessages array
+		for (const gc of this.data.goalContexts) {
+			if (!gc.tinkerMessages) gc.tinkerMessages = [];
+		}
+
+		// Migrate legacy shared messages to the first goal context
+		if (this.data.tinkerMessages && this.data.tinkerMessages.length > 0) {
+			if (this.data.goalContexts.length > 0 && this.data.goalContexts[0].tinkerMessages.length === 0) {
+				this.data.goalContexts[0].tinkerMessages = [...this.data.tinkerMessages];
+			}
+			delete this.data.tinkerMessages;
+			this.saveData();
+		}
 	}
 
-	getPolicy(): NorthStarPolicy {
-		return this.data.policy;
+	// ── Active goal persistence ──
+
+	getActiveGoalId(): string | null {
+		return this.data.activeGoalId ?? null;
 	}
 
-	getAssessments(): Assessment[] {
-		return this.data.assessments;
+	async setActiveGoalId(goalId: string | null): Promise<void> {
+		this.data.activeGoalId = goalId;
+		await this.saveData();
 	}
 
-	getLatestAssessment(): Assessment | null {
-		if (this.data.assessments.length === 0) return null;
-		return this.data.assessments[this.data.assessments.length - 1];
+	// ── Goal access ──
+
+	getGoals(): NorthStarGoal[] {
+		return this.data.goalContexts.map(gc => gc.goal);
 	}
 
-	getDayNumber(): number {
-		const goal = this.data.goal;
-		if (!goal) return 0;
-		const lockedDate = new Date(goal.lockedAt);
+	getGoalContext(goalId: string): GoalContext | null {
+		return this.data.goalContexts.find(gc => gc.goal.id === goalId) ?? null;
+	}
+
+	getGoalContexts(): GoalContext[] {
+		return this.data.goalContexts;
+	}
+
+	getPolicy(goalId: string): NorthStarPolicy {
+		const ctx = this.getGoalContext(goalId);
+		if (!ctx) return { ...DEFAULT_POLICY, signalWeights: { ...DEFAULT_SIGNAL_WEIGHTS }, milestones: [] };
+		return ctx.policy;
+	}
+
+	getAssessments(goalId: string): Assessment[] {
+		const ctx = this.getGoalContext(goalId);
+		if (!ctx) return [];
+		return ctx.assessments;
+	}
+
+	getAllAssessments(): Assessment[] {
+		return this.data.goalContexts.flatMap(gc => gc.assessments);
+	}
+
+	getLatestAssessment(goalId: string): Assessment | null {
+		const assessments = this.getAssessments(goalId);
+		if (assessments.length === 0) return null;
+		return assessments[assessments.length - 1];
+	}
+
+	getDayNumber(goalId: string): number {
+		const ctx = this.getGoalContext(goalId);
+		if (!ctx) return 0;
+		const lockedDate = new Date(ctx.goal.lockedAt);
 		lockedDate.setHours(0, 0, 0, 0);
 		const now = new Date();
 		now.setHours(0, 0, 0, 0);
@@ -54,77 +107,106 @@ export class NorthStarManager {
 		return Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1;
 	}
 
-	getDaysLeft(): number {
-		const goal = this.data.goal;
-		if (!goal) return 0;
-		return Math.max(0, goal.timeWindowDays - this.getDayNumber() + 1);
+	getDaysLeft(goalId: string): number {
+		const ctx = this.getGoalContext(goalId);
+		if (!ctx) return 0;
+		return Math.max(0, ctx.goal.timeWindowDays - this.getDayNumber(goalId) + 1);
 	}
 
-	async setGoal(text: string, timeWindowDays: number): Promise<NorthStarGoal> {
-		// Archive current goal if exists
-		if (this.data.goal) {
-			this.data.goal.active = false;
-			this.data.archivedGoals.push(this.data.goal);
+	async addGoal(text: string, timeWindowDays: number, context?: string): Promise<NorthStarGoal> {
+		if (this.data.goalContexts.length >= MAX_GOALS) {
+			throw new Error(`Maximum of ${MAX_GOALS} concurrent goals allowed`);
 		}
 
 		const goal: NorthStarGoal = {
 			id: `ns-${Date.now()}`,
 			text,
+			...(context ? { context } : {}),
 			timeWindowDays,
 			lockedAt: Date.now(),
 			currentPhase: "exploration",
 			active: true,
 		};
 
-		this.data.goal = goal;
-		this.data.policy = {
-			signalWeights: { ...DEFAULT_SIGNAL_WEIGHTS },
-			checkInPrompts: [],
-			milestones: [],
-			version: 1,
+		const ctx: GoalContext = {
+			goal,
+			policy: {
+				signalWeights: { ...DEFAULT_SIGNAL_WEIGHTS },
+				checkInPrompts: [],
+				milestones: [],
+				version: 1,
+			},
+			assessments: [],
+			tinkerMessages: [],
 		};
-		this.data.assessments = [];
-		this.data.tinkerMessages = [];
 
+		this.data.goalContexts.push(ctx);
 		await this.saveData();
 		return goal;
 	}
 
-	async addAssessment(assessment: Assessment): Promise<void> {
+	async addAssessment(goalId: string, assessment: Assessment): Promise<void> {
+		const ctx = this.getGoalContext(goalId);
+		if (!ctx) throw new Error(`Goal context not found for goalId: ${goalId}`);
+
 		// Replace existing assessment for the same date, or add new
-		const existingIndex = this.data.assessments.findIndex(
+		const existingIndex = ctx.assessments.findIndex(
 			(a) => a.date === assessment.date
 		);
 		if (existingIndex >= 0) {
-			this.data.assessments[existingIndex] = assessment;
+			ctx.assessments[existingIndex] = assessment;
 		} else {
-			this.data.assessments.push(assessment);
+			ctx.assessments.push(assessment);
 		}
 		await this.saveData();
 	}
 
-	async archiveGoal(): Promise<void> {
-		if (!this.data.goal) return;
-		this.data.goal.active = false;
-		this.data.archivedGoals.push(this.data.goal);
-		this.data.goal = null;
-		this.data.assessments = [];
-		this.data.tinkerMessages = [];
-		this.data.policy = { ...DEFAULT_POLICY, signalWeights: { ...DEFAULT_SIGNAL_WEIGHTS }, milestones: [] };
+	async archiveGoal(goalId: string): Promise<void> {
+		const idx = this.data.goalContexts.findIndex(gc => gc.goal.id === goalId);
+		if (idx < 0) return;
+
+		const ctx = this.data.goalContexts[idx];
+		ctx.goal.active = false;
+		this.data.archivedGoals.push(ctx.goal);
+		this.data.goalContexts.splice(idx, 1);
+
 		await this.saveData();
 	}
 
-	getTinkerMessages(): TinkerMessage[] {
-		return this.data.tinkerMessages;
-	}
-
-	async addTinkerMessage(msg: TinkerMessage): Promise<void> {
-		this.data.tinkerMessages.push(msg);
+	async updateGoalContext(goalId: string, context: string): Promise<void> {
+		const ctx = this.getGoalContext(goalId);
+		if (!ctx) throw new Error(`Goal context not found for goalId: ${goalId}`);
+		if (context) {
+			ctx.goal.context = context;
+		} else {
+			delete ctx.goal.context;
+		}
 		await this.saveData();
 	}
 
-	async clearTinkerMessages(): Promise<void> {
-		this.data.tinkerMessages = [];
+	canAddGoal(): boolean {
+		return this.data.goalContexts.length < MAX_GOALS;
+	}
+
+	// ── Tinker messages (per-goal) ──
+
+	getTinkerMessages(goalId: string): TinkerMessage[] {
+		const ctx = this.getGoalContext(goalId);
+		if (!ctx) return [];
+		return ctx.tinkerMessages;
+	}
+
+	async addTinkerMessage(goalId: string, msg: TinkerMessage): Promise<void> {
+		const ctx = this.getGoalContext(goalId);
+		if (!ctx) return;
+		ctx.tinkerMessages.push(msg);
+		await this.saveData();
+	}
+
+	async clearTinkerMessages(goalId: string): Promise<void> {
+		const ctx = this.getGoalContext(goalId);
+		if (!ctx) return;
+		ctx.tinkerMessages = [];
 		await this.saveData();
 	}
 }

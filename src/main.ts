@@ -156,18 +156,18 @@ export default class ActaTaskPlugin extends Plugin {
 		});
 
 		// Task board ribbon and commands
-		this.addRibbonIcon("list-checks", "Open Acta Task Board", () => {
+		this.addRibbonIcon("list-checks", "Open Northstar Board", () => {
 			this.openBoard();
 		});
 
 		this.addCommand({
-			id: "open-acta-task-board",
+			id: "open-northstar-board",
 			name: "Open task board",
 			callback: () => this.openBoard(),
 		});
 
 		this.addCommand({
-			id: "refresh-acta-task-board",
+			id: "refresh-northstar-board",
 			name: "Refresh task board",
 			callback: () => this.refreshBoard(),
 		});
@@ -341,23 +341,45 @@ export default class ActaTaskPlugin extends Plugin {
 
 	async loadNorthStarData(): Promise<void> {
 		const data = await this.loadData();
+		const raw = data?.northStar;
 		this.northStarData = Object.assign(
 			{},
 			DEFAULT_NORTHSTAR_DATA,
-			data?.northStar
+			raw
 		);
 		// Ensure nested defaults
-		if (!this.northStarData.policy) {
-			this.northStarData.policy = { ...DEFAULT_NORTHSTAR_DATA.policy };
-		}
-		if (!this.northStarData.assessments) {
-			this.northStarData.assessments = [];
-		}
 		if (!this.northStarData.archivedGoals) {
 			this.northStarData.archivedGoals = [];
 		}
-		if (!this.northStarData.tinkerMessages) {
-			this.northStarData.tinkerMessages = [];
+		// tinkerMessages is now per-goal (legacy shared field handled by manager migration)
+		if (!this.northStarData.goalContexts) {
+			this.northStarData.goalContexts = [];
+		}
+
+		// Migrate legacy single-goal data to goalContexts
+		if (raw?.goal && !raw.goalContexts) {
+			const legacyGoal = raw.goal;
+			const legacyPolicy = raw.policy || { ...DEFAULT_NORTHSTAR_DATA };
+			const legacyAssessments: import("./northStarTypes").Assessment[] = raw.assessments || [];
+
+			// Backfill goalId on legacy assessments
+			for (const a of legacyAssessments) {
+				if (!a.goalId) {
+					a.goalId = legacyGoal.id;
+				}
+			}
+
+			this.northStarData.goalContexts = [{
+				goal: legacyGoal,
+				policy: legacyPolicy,
+				assessments: legacyAssessments,
+				tinkerMessages: [],
+			}];
+
+			// Clean up legacy fields
+			delete this.northStarData.goal;
+			delete this.northStarData.policy;
+			delete this.northStarData.assessments;
 		}
 	}
 

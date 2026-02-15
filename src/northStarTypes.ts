@@ -3,6 +3,7 @@
 export interface NorthStarGoal {
 	id: string;
 	text: string;
+	context?: string;
 	timeWindowDays: number;
 	lockedAt: number; // timestamp
 	currentPhase: "exploration" | "execution" | "refinement";
@@ -41,6 +42,7 @@ export interface TaskSignal {
 	timeAnnotation?: string;
 	durationMin?: number;
 	effort: "deep_work" | "quick_action";
+	priority: boolean;
 }
 
 export interface FeedbackSignal {
@@ -77,6 +79,7 @@ export interface SignalBreakdownItem {
 
 export interface Assessment {
 	id: string;
+	goalId: string;
 	date: string;
 	dayNumber: number;
 	overallScore: number; // 0-100
@@ -85,6 +88,13 @@ export interface Assessment {
 	momentumIndicators: string[];
 	rawSignals: DaySignals;
 	policyVersion: number;
+}
+
+export interface GoalContext {
+	goal: NorthStarGoal;
+	policy: NorthStarPolicy;
+	assessments: Assessment[];
+	tinkerMessages: TinkerMessage[];
 }
 
 // Anthropic API content block types for tool use
@@ -102,14 +112,18 @@ export interface TinkerMessage {
 	content: string;
 	timestamp: number;
 	assessmentId?: string;
+	referencedFiles?: { path: string; basename: string }[];
 }
 
 export interface ActaNorthStarData {
-	goal: NorthStarGoal | null;
-	policy: NorthStarPolicy;
-	assessments: Assessment[];
+	goalContexts: GoalContext[];
 	archivedGoals: NorthStarGoal[];
-	tinkerMessages: TinkerMessage[];
+	activeGoalId?: string | null;
+	tinkerMessages?: TinkerMessage[]; // Legacy: shared messages (migrated to per-goal)
+	// Legacy fields for migration (pre-multi-goal)
+	goal?: NorthStarGoal | null;
+	policy?: NorthStarPolicy;
+	assessments?: Assessment[];
 }
 
 export const DEFAULT_SIGNAL_WEIGHTS: SignalWeights = {
@@ -128,11 +142,8 @@ export const DEFAULT_POLICY: NorthStarPolicy = {
 };
 
 export const DEFAULT_NORTHSTAR_DATA: ActaNorthStarData = {
-	goal: null,
-	policy: { ...DEFAULT_POLICY, signalWeights: { ...DEFAULT_SIGNAL_WEIGHTS }, milestones: [] },
-	assessments: [],
+	goalContexts: [],
 	archivedGoals: [],
-	tinkerMessages: [],
 };
 
 export const TIME_ANNOTATION_REGEX = /@(\d{1,2}(?::?\d{2})?)\s*(?:AM|PM|am|pm)?\s*[-–]\s*(\d{1,2}(?::?\d{2})?)\s*(?:AM|PM|am|pm)?/;

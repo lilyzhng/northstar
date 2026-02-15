@@ -38,7 +38,7 @@ var DEFAULT_SETTINGS = {
 var DEFAULT_DATA = {
   addedTasks: {}
 };
-var ACTA_TASK_VIEW_TYPE = "acta-task-board";
+var ACTA_TASK_VIEW_TYPE = "northstar-board";
 var DEFAULT_FEEDBACK_DATA = {
   addedFeedback: {}
 };
@@ -67,7 +67,7 @@ var TaskBoardView = class extends import_obsidian.ItemView {
     return ACTA_TASK_VIEW_TYPE;
   }
   getDisplayText() {
-    return "Acta Task Board";
+    return "Northstar Board";
   }
   getIcon() {
     return "list-checks";
@@ -75,8 +75,8 @@ var TaskBoardView = class extends import_obsidian.ItemView {
   async onOpen() {
     const container = this.containerEl.children[1];
     container.empty();
-    container.addClass("acta-task-container");
-    this.boardEl = container.createDiv({ cls: "acta-task-board" });
+    container.addClass("northstar-container");
+    this.boardEl = container.createDiv({ cls: "northstar-board" });
     await this.refresh();
     this.registerEvents();
   }
@@ -112,11 +112,11 @@ var TaskBoardView = class extends import_obsidian.ItemView {
     if (!this.boardEl)
       return;
     this.boardEl.empty();
-    const header = this.boardEl.createDiv({ cls: "acta-task-header" });
-    const titleRow = header.createDiv({ cls: "acta-task-title-row" });
+    const header = this.boardEl.createDiv({ cls: "northstar-header" });
+    const titleRow = header.createDiv({ cls: "northstar-title-row" });
     titleRow.createEl("h4", { text: "Task Board" });
     const refreshBtn = titleRow.createEl("button", {
-      cls: "acta-task-refresh-btn clickable-icon",
+      cls: "northstar-refresh-btn clickable-icon",
       attr: { "aria-label": "Refresh" }
     });
     refreshBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`;
@@ -127,37 +127,37 @@ var TaskBoardView = class extends import_obsidian.ItemView {
       0
     );
     header.createDiv({
-      cls: "acta-task-stats",
+      cls: "northstar-stats",
       text: `${completedTasks}/${totalTasks} done across ${topics.length} topics`
     });
     if (topics.length === 0) {
       this.boardEl.createDiv({
-        cls: "acta-task-empty",
+        cls: "northstar-empty",
         text: "No tasks yet. Add checkboxes with inline hashtags (e.g. - [ ] #people do something) to see them here."
       });
       return;
     }
-    const list = this.boardEl.createDiv({ cls: "acta-task-topics" });
+    const list = this.boardEl.createDiv({ cls: "northstar-topics" });
     for (const topic of topics) {
       this.renderTopicSection(list, topic);
     }
   }
   renderTopicSection(parent, topic) {
-    const section = parent.createDiv({ cls: "acta-task-topic-section" });
+    const section = parent.createDiv({ cls: "northstar-topic-section" });
     const isCollapsed = this.collapsedTopics.has(topic.tag);
     const topicHeader = section.createDiv({
-      cls: "acta-task-topic-header"
+      cls: "northstar-topic-header"
     });
     const chevron = topicHeader.createSpan({
-      cls: `acta-task-chevron ${isCollapsed ? "is-collapsed" : ""}`
+      cls: `northstar-chevron ${isCollapsed ? "is-collapsed" : ""}`
     });
     chevron.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
     topicHeader.createSpan({
-      cls: "acta-task-topic-tag",
+      cls: "northstar-topic-tag",
       text: `#${topic.displayTag}`
     });
     topicHeader.createSpan({
-      cls: "acta-task-topic-count",
+      cls: "northstar-topic-count",
       text: `${topic.completedCount}/${topic.totalCount}`
     });
     topicHeader.addEventListener("click", () => {
@@ -169,7 +169,7 @@ var TaskBoardView = class extends import_obsidian.ItemView {
       this.refresh();
     });
     if (!isCollapsed) {
-      const taskList = section.createDiv({ cls: "acta-task-list" });
+      const taskList = section.createDiv({ cls: "northstar-list" });
       for (const task of topic.tasks) {
         if (!this.settings.showCompleted && task.completed)
           continue;
@@ -179,30 +179,30 @@ var TaskBoardView = class extends import_obsidian.ItemView {
   }
   renderTaskItem(parent, task) {
     const item = parent.createDiv({
-      cls: `acta-task-item ${task.completed ? "is-completed" : ""}`
+      cls: `northstar-item ${task.completed ? "is-completed" : ""}`
     });
     const checkbox = item.createEl("input", {
       type: "checkbox",
-      cls: "acta-task-checkbox task-list-item-checkbox"
+      cls: "northstar-checkbox task-list-item-checkbox"
     });
     checkbox.checked = task.completed;
     checkbox.addEventListener("click", async (e) => {
       e.preventDefault();
       const success = await this.toggler.toggleTask(task);
       if (!success) {
-        console.error("Acta Task: Failed to toggle task", task.id);
+        console.error("Northstar: Failed to toggle task", task.id);
       }
     });
     item.createSpan({
-      cls: "acta-task-text",
+      cls: "northstar-text",
       text: task.text
     });
     if (this.settings.showSourceNote) {
       const metaContainer = item.createSpan({
-        cls: "acta-task-meta"
+        cls: "northstar-meta"
       });
       const badge = metaContainer.createSpan({
-        cls: "acta-task-source-badge",
+        cls: "northstar-source-badge",
         text: task.fileName
       });
       badge.addEventListener("click", async (e) => {
@@ -222,12 +222,12 @@ var TaskBoardView = class extends import_obsidian.ItemView {
         day: "numeric"
       });
       metaContainer.createSpan({
-        cls: "acta-task-date-badge",
+        cls: "northstar-date-badge",
         text: dateStr
       });
     }
     const removeBtn = item.createSpan({
-      cls: "acta-task-remove-btn",
+      cls: "northstar-remove-btn",
       text: "\xD7",
       attr: { title: "Remove from board" }
     });
@@ -262,8 +262,8 @@ var FeedbackBoardView = class extends import_obsidian2.ItemView {
   async onOpen() {
     const container = this.containerEl.children[1];
     container.empty();
-    container.addClass("acta-task-container");
-    this.boardEl = container.createDiv({ cls: "acta-task-board" });
+    container.addClass("northstar-container");
+    this.boardEl = container.createDiv({ cls: "northstar-board" });
     await this.refresh();
     this.registerEvents();
   }
@@ -299,48 +299,48 @@ var FeedbackBoardView = class extends import_obsidian2.ItemView {
     if (!this.boardEl)
       return;
     this.boardEl.empty();
-    const header = this.boardEl.createDiv({ cls: "acta-task-header" });
-    const titleRow = header.createDiv({ cls: "acta-task-title-row" });
+    const header = this.boardEl.createDiv({ cls: "northstar-header" });
+    const titleRow = header.createDiv({ cls: "northstar-title-row" });
     titleRow.createEl("h4", { text: "\u2764\uFE0F \u6B63\u53CD\u9988board" });
     const refreshBtn = titleRow.createEl("button", {
-      cls: "acta-task-refresh-btn clickable-icon",
+      cls: "northstar-refresh-btn clickable-icon",
       attr: { "aria-label": "Refresh" }
     });
     refreshBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`;
     refreshBtn.addEventListener("click", () => this.refresh());
     const totalItems = topics.reduce((sum, t) => sum + t.totalCount, 0);
     header.createDiv({
-      cls: "acta-task-stats",
+      cls: "northstar-stats",
       text: `${totalItems} items across ${topics.length} topics`
     });
     if (topics.length === 0) {
       this.boardEl.createDiv({
-        cls: "acta-task-empty",
+        cls: "northstar-empty",
         text: "No \u6B63\u53CD\u9988 items yet. Add notes with #\u6B63\u53CD\u9988 or #\u2764\uFE0F and a topic tag (e.g. #coding) to see them here."
       });
       return;
     }
-    const list = this.boardEl.createDiv({ cls: "acta-task-topics" });
+    const list = this.boardEl.createDiv({ cls: "northstar-topics" });
     for (const topic of topics) {
       this.renderTopicSection(list, topic);
     }
   }
   renderTopicSection(parent, topic) {
-    const section = parent.createDiv({ cls: "acta-task-topic-section" });
+    const section = parent.createDiv({ cls: "northstar-topic-section" });
     const isCollapsed = this.collapsedTopics.has(topic.tag);
     const topicHeader = section.createDiv({
-      cls: "acta-task-topic-header"
+      cls: "northstar-topic-header"
     });
     const chevron = topicHeader.createSpan({
-      cls: `acta-task-chevron ${isCollapsed ? "is-collapsed" : ""}`
+      cls: `northstar-chevron ${isCollapsed ? "is-collapsed" : ""}`
     });
     chevron.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
     topicHeader.createSpan({
-      cls: "acta-task-topic-tag",
+      cls: "northstar-topic-tag",
       text: `#${topic.displayTag}`
     });
     topicHeader.createSpan({
-      cls: "acta-task-topic-count",
+      cls: "northstar-topic-count",
       text: `${topic.totalCount}`
     });
     topicHeader.addEventListener("click", () => {
@@ -352,7 +352,7 @@ var FeedbackBoardView = class extends import_obsidian2.ItemView {
       this.refresh();
     });
     if (!isCollapsed) {
-      const itemList = section.createDiv({ cls: "acta-task-list" });
+      const itemList = section.createDiv({ cls: "northstar-list" });
       for (const item of topic.items) {
         this.renderFeedbackItem(itemList, item);
       }
@@ -360,18 +360,18 @@ var FeedbackBoardView = class extends import_obsidian2.ItemView {
   }
   renderFeedbackItem(parent, item) {
     const itemEl = parent.createDiv({
-      cls: "acta-task-item acta-feedback-item"
+      cls: "northstar-item acta-feedback-item"
     });
     itemEl.createSpan({
-      cls: "acta-task-text acta-feedback-text",
+      cls: "northstar-text acta-feedback-text",
       text: item.text
     });
     if (this.settings.showSourceNote) {
       const metaContainer = itemEl.createSpan({
-        cls: "acta-task-meta"
+        cls: "northstar-meta"
       });
       const badge = metaContainer.createSpan({
-        cls: "acta-task-source-badge",
+        cls: "northstar-source-badge",
         text: item.fileName
       });
       badge.addEventListener("click", async (e) => {
@@ -391,12 +391,12 @@ var FeedbackBoardView = class extends import_obsidian2.ItemView {
         day: "numeric"
       });
       metaContainer.createSpan({
-        cls: "acta-task-date-badge",
+        cls: "northstar-date-badge",
         text: dateStr
       });
     }
     const removeBtn = itemEl.createSpan({
-      cls: "acta-task-remove-btn",
+      cls: "northstar-remove-btn",
       text: "\xD7",
       attr: { title: "Remove from board" }
     });
@@ -431,8 +431,8 @@ var NegativeFeedbackBoardView = class extends import_obsidian3.ItemView {
   async onOpen() {
     const container = this.containerEl.children[1];
     container.empty();
-    container.addClass("acta-task-container");
-    this.boardEl = container.createDiv({ cls: "acta-task-board acta-negative-feedback-board" });
+    container.addClass("northstar-container");
+    this.boardEl = container.createDiv({ cls: "northstar-board acta-negative-feedback-board" });
     await this.refresh();
     this.registerEvents();
   }
@@ -468,48 +468,48 @@ var NegativeFeedbackBoardView = class extends import_obsidian3.ItemView {
     if (!this.boardEl)
       return;
     this.boardEl.empty();
-    const header = this.boardEl.createDiv({ cls: "acta-task-header" });
-    const titleRow = header.createDiv({ cls: "acta-task-title-row" });
+    const header = this.boardEl.createDiv({ cls: "northstar-header" });
+    const titleRow = header.createDiv({ cls: "northstar-title-row" });
     titleRow.createEl("h4", { text: "\u{1F612} \u8D1F\u53CD\u9988board" });
     const refreshBtn = titleRow.createEl("button", {
-      cls: "acta-task-refresh-btn clickable-icon",
+      cls: "northstar-refresh-btn clickable-icon",
       attr: { "aria-label": "Refresh" }
     });
     refreshBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`;
     refreshBtn.addEventListener("click", () => this.refresh());
     const totalItems = topics.reduce((sum, t) => sum + t.totalCount, 0);
     header.createDiv({
-      cls: "acta-task-stats",
+      cls: "northstar-stats",
       text: `${totalItems} items across ${topics.length} topics`
     });
     if (topics.length === 0) {
       this.boardEl.createDiv({
-        cls: "acta-task-empty",
+        cls: "northstar-empty",
         text: "No \u8D1F\u53CD\u9988 items yet. Add notes with #\u{1F612} and a topic tag (e.g. #work) to see them here."
       });
       return;
     }
-    const list = this.boardEl.createDiv({ cls: "acta-task-topics" });
+    const list = this.boardEl.createDiv({ cls: "northstar-topics" });
     for (const topic of topics) {
       this.renderTopicSection(list, topic);
     }
   }
   renderTopicSection(parent, topic) {
-    const section = parent.createDiv({ cls: "acta-task-topic-section" });
+    const section = parent.createDiv({ cls: "northstar-topic-section" });
     const isCollapsed = this.collapsedTopics.has(topic.tag);
     const topicHeader = section.createDiv({
-      cls: "acta-task-topic-header"
+      cls: "northstar-topic-header"
     });
     const chevron = topicHeader.createSpan({
-      cls: `acta-task-chevron ${isCollapsed ? "is-collapsed" : ""}`
+      cls: `northstar-chevron ${isCollapsed ? "is-collapsed" : ""}`
     });
     chevron.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
     topicHeader.createSpan({
-      cls: "acta-task-topic-tag",
+      cls: "northstar-topic-tag",
       text: `#${topic.displayTag}`
     });
     topicHeader.createSpan({
-      cls: "acta-task-topic-count",
+      cls: "northstar-topic-count",
       text: `${topic.totalCount}`
     });
     topicHeader.addEventListener("click", () => {
@@ -521,7 +521,7 @@ var NegativeFeedbackBoardView = class extends import_obsidian3.ItemView {
       this.refresh();
     });
     if (!isCollapsed) {
-      const itemList = section.createDiv({ cls: "acta-task-list" });
+      const itemList = section.createDiv({ cls: "northstar-list" });
       for (const item of topic.items) {
         this.renderFeedbackItem(itemList, item);
       }
@@ -529,18 +529,18 @@ var NegativeFeedbackBoardView = class extends import_obsidian3.ItemView {
   }
   renderFeedbackItem(parent, item) {
     const itemEl = parent.createDiv({
-      cls: "acta-task-item acta-feedback-item acta-negative-feedback-item"
+      cls: "northstar-item acta-feedback-item acta-negative-feedback-item"
     });
     itemEl.createSpan({
-      cls: "acta-task-text acta-feedback-text",
+      cls: "northstar-text acta-feedback-text",
       text: item.text
     });
     if (this.settings.showSourceNote) {
       const metaContainer = itemEl.createSpan({
-        cls: "acta-task-meta"
+        cls: "northstar-meta"
       });
       const badge = metaContainer.createSpan({
-        cls: "acta-task-source-badge",
+        cls: "northstar-source-badge",
         text: item.fileName
       });
       badge.addEventListener("click", async (e) => {
@@ -560,12 +560,12 @@ var NegativeFeedbackBoardView = class extends import_obsidian3.ItemView {
         day: "numeric"
       });
       metaContainer.createSpan({
-        cls: "acta-task-date-badge",
+        cls: "northstar-date-badge",
         text: dateStr
       });
     }
     const removeBtn = itemEl.createSpan({
-      cls: "acta-task-remove-btn",
+      cls: "northstar-remove-btn",
       text: "\xD7",
       attr: { title: "Remove from board" }
     });
@@ -587,6 +587,7 @@ var NorthStarGoalModal = class extends import_obsidian4.Modal {
     super(app);
     this.goalText = "";
     this.timeWindowDays = 30;
+    this.goalContext = "";
     this.onSubmit = onSubmit;
   }
   onOpen() {
@@ -610,11 +611,54 @@ var NorthStarGoalModal = class extends import_obsidian4.Modal {
         }
       })
     );
+    new import_obsidian4.Setting(contentEl).setName("Context / Reference").setDesc("Paste job postings, links, skill requirements, or any reference material that defines what this goal looks like.").addTextArea(
+      (text) => text.setPlaceholder("e.g., Job posting URL, required skills, key milestones...").onChange((value) => {
+        this.goalContext = value;
+      })
+    );
+    const contextTextarea = contentEl.querySelector(".setting-item:nth-child(4) textarea");
+    if (contextTextarea instanceof HTMLTextAreaElement) {
+      contextTextarea.rows = 6;
+    }
     new import_obsidian4.Setting(contentEl).addButton(
       (btn) => btn.setButtonText("Lock It In").setCta().onClick(() => {
         if (this.goalText.trim().length === 0)
           return;
-        this.onSubmit(this.goalText.trim(), this.timeWindowDays);
+        this.onSubmit(this.goalText.trim(), this.timeWindowDays, this.goalContext.trim());
+        this.close();
+      })
+    );
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+};
+var NorthStarEditContextModal = class extends import_obsidian4.Modal {
+  constructor(app, currentContext, onSubmit) {
+    super(app);
+    this.contextValue = currentContext;
+    this.onSubmit = onSubmit;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl("h3", { text: "Edit Goal Context" });
+    contentEl.createEl("p", {
+      text: "Paste job postings, links, skill requirements, or any reference material that defines what this goal looks like.",
+      cls: "setting-item-description"
+    });
+    const textarea = contentEl.createEl("textarea", {
+      cls: "acta-northstar-context-textarea",
+      attr: { placeholder: "e.g., Job posting URL, required skills, key milestones...", rows: "8" }
+    });
+    textarea.value = this.contextValue;
+    textarea.style.width = "100%";
+    textarea.addEventListener("input", () => {
+      this.contextValue = textarea.value;
+    });
+    new import_obsidian4.Setting(contentEl).addButton(
+      (btn) => btn.setButtonText("Save").setCta().onClick(() => {
+        this.onSubmit(this.contextValue.trim());
         this.close();
       })
     );
@@ -628,10 +672,15 @@ var NorthStarGoalModal = class extends import_obsidian4.Modal {
 var TOOL_DEFINITIONS = [
   {
     name: "get_today_date",
-    description: "Get today's local date, day number, and whether a check-in already exists for today. Always call this first before observe_signals or run_assessment.",
+    description: "Get date info, day number for the current goal, and whether a check-in already exists. Always call this first before observe_signals or run_assessment. Pass a date to query a specific day (e.g. yesterday), or omit for today.",
     input_schema: {
       type: "object",
-      properties: {},
+      properties: {
+        date: {
+          type: "string",
+          description: "Optional date in YYYY-MM-DD format. If omitted, returns today's date. Use this when the user wants to check in for a different day (e.g. yesterday)."
+        }
+      },
       required: []
     }
   },
@@ -651,7 +700,7 @@ var TOOL_DEFINITIONS = [
   },
   {
     name: "run_assessment",
-    description: "Run an LLM alignment assessment on collected signals. Call observe_signals first. Pass the same date.",
+    description: "Run LLM alignment assessment on collected signals for the current goal. Call observe_signals first. Pass the same date.",
     input_schema: {
       type: "object",
       properties: {
@@ -687,7 +736,7 @@ var TOOL_DEFINITIONS = [
   },
   {
     name: "get_assessment_history",
-    description: "Retrieve past assessments for trend analysis.",
+    description: "Retrieve past assessments for trend analysis for the current goal.",
     input_schema: {
       type: "object",
       properties: {
@@ -707,6 +756,15 @@ var NorthStarBoardView = class extends import_obsidian5.ItemView {
     this.isSending = false;
     this.chatMessagesEl = null;
     this.lastObservedSignals = null;
+    this.activeGoalId = null;
+    // @ mention state
+    this.referencedFiles = [];
+    this.mentionDropdownEl = null;
+    this.mentionQuery = "";
+    this.mentionStartIndex = -1;
+    this.mentionSelectedIndex = 0;
+    this.mentionFilteredFiles = [];
+    this.fileChipsEl = null;
     this.manager = manager;
     this.agent = agent;
     this.llmClient = llmClient;
@@ -724,7 +782,8 @@ var NorthStarBoardView = class extends import_obsidian5.ItemView {
   async onOpen() {
     const container = this.containerEl.children[1];
     container.empty();
-    container.addClass("acta-task-container");
+    container.addClass("northstar-container");
+    this.activeGoalId = this.manager.getActiveGoalId();
     this.boardEl = container.createDiv({ cls: "acta-northstar-board" });
     this.renderBoard();
   }
@@ -742,18 +801,27 @@ var NorthStarBoardView = class extends import_obsidian5.ItemView {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   }
+  getYesterdayDateStr() {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
   renderBoard() {
     if (!this.boardEl)
       return;
     this.boardEl.empty();
     this.chatMessagesEl = null;
-    const goal = this.manager.getGoal();
+    const goals = this.manager.getGoals();
     this.renderHeader();
-    if (!goal) {
+    if (goals.length === 0) {
+      this.activeGoalId = null;
       this.renderEmptyGoalState();
       return;
     }
-    this.renderGoalCard();
+    if (!this.activeGoalId || !goals.find((g) => g.id === this.activeGoalId)) {
+      this.activeGoalId = goals[0].id;
+    }
+    this.renderGoalsSection(goals);
     this.renderTinkerChat();
   }
   renderHeader() {
@@ -781,17 +849,75 @@ var NorthStarBoardView = class extends import_obsidian5.ItemView {
     });
     setBtn.addEventListener("click", () => this.openGoalModal());
   }
-  renderGoalCard() {
+  switchActiveGoal(goalId) {
+    this.activeGoalId = goalId;
+    this.manager.setActiveGoalId(goalId);
+    this.renderBoard();
+  }
+  renderGoalsSection(goals) {
     if (!this.boardEl)
       return;
-    const goal = this.manager.getGoal();
-    if (!goal)
-      return;
-    const card = this.boardEl.createDiv({ cls: "acta-northstar-goal-card" });
+    const section = this.boardEl.createDiv({ cls: "acta-northstar-goals-section" });
+    const activeIndex = goals.findIndex((g) => g.id === this.activeGoalId);
+    const currentIndex = activeIndex >= 0 ? activeIndex : 0;
+    const activeGoal = goals[currentIndex];
+    const carousel = section.createDiv({ cls: "acta-northstar-goal-carousel" });
+    const leftArrow = carousel.createEl("button", {
+      cls: "acta-northstar-carousel-arrow",
+      text: "\u2039",
+      attr: { "aria-label": "Previous goal" }
+    });
+    leftArrow.disabled = currentIndex === 0;
+    leftArrow.addEventListener("click", () => {
+      if (currentIndex > 0 && !this.isSending) {
+        this.switchActiveGoal(goals[currentIndex - 1].id);
+      }
+    });
+    const cardWrapper = carousel.createDiv({ cls: "acta-northstar-carousel-card-wrapper" });
+    this.renderGoalCard(cardWrapper, activeGoal);
+    const rightArrow = carousel.createEl("button", {
+      cls: "acta-northstar-carousel-arrow",
+      text: "\u203A",
+      attr: { "aria-label": "Next goal" }
+    });
+    rightArrow.disabled = currentIndex === goals.length - 1;
+    rightArrow.addEventListener("click", () => {
+      if (currentIndex < goals.length - 1 && !this.isSending) {
+        this.switchActiveGoal(goals[currentIndex + 1].id);
+      }
+    });
+    if (goals.length > 1) {
+      const dots = section.createDiv({ cls: "acta-northstar-carousel-dots" });
+      for (let i = 0; i < goals.length; i++) {
+        const dot = dots.createDiv({
+          cls: `acta-northstar-carousel-dot${i === currentIndex ? " is-active" : ""}`
+        });
+        dot.addEventListener("click", () => {
+          if (i !== currentIndex && !this.isSending) {
+            this.switchActiveGoal(goals[i].id);
+          }
+        });
+      }
+    }
+    if (this.manager.canAddGoal()) {
+      const addBtn = section.createDiv({ cls: "acta-northstar-add-goal-btn" });
+      addBtn.textContent = "+";
+      addBtn.setAttribute("aria-label", "Add another goal");
+      addBtn.addEventListener("click", () => this.openGoalModal());
+    }
+  }
+  renderGoalCard(parent, goal) {
+    const isActive = goal.id === this.activeGoalId;
+    const card = parent.createDiv({ cls: `acta-northstar-goal-card${isActive ? " is-active" : ""}` });
+    card.addEventListener("click", () => {
+      if (this.activeGoalId !== goal.id && !this.isSending) {
+        this.switchActiveGoal(goal.id);
+      }
+    });
     const goalText = card.createDiv({ cls: "acta-northstar-goal-text" });
     goalText.createEl("span", { text: goal.text });
     const badges = card.createDiv({ cls: "acta-northstar-goal-badges" });
-    const dayNum = this.manager.getDayNumber();
+    const dayNum = this.manager.getDayNumber(goal.id);
     badges.createEl("span", {
       cls: "acta-northstar-badge",
       text: `Day ${dayNum} of ${goal.timeWindowDays}`
@@ -800,15 +926,24 @@ var NorthStarBoardView = class extends import_obsidian5.ItemView {
       cls: "acta-northstar-badge acta-northstar-badge-phase",
       text: goal.currentPhase
     });
-    const daysLeft = this.manager.getDaysLeft();
+    const daysLeft = this.manager.getDaysLeft(goal.id);
     badges.createEl("span", {
       cls: `acta-northstar-badge ${daysLeft <= 7 ? "acta-northstar-badge-urgent" : ""}`,
       text: `${daysLeft}d left`
     });
+    const contextLink = badges.createEl("span", {
+      cls: "acta-northstar-goal-context-link",
+      text: goal.context ? "edit context" : "+ Add context",
+      attr: { "aria-label": goal.context ? "Edit context" : "Add reference context" }
+    });
+    contextLink.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.openEditContextModal(goal);
+    });
   }
   formatCategoryName(category) {
     const names = {
-      goalDirectDeepWork: "Goal-Direct Deep Work",
+      goalDirectDeepWork: "Focused Deep Work",
       taskCompletion: "Task Completion",
       reflectionDepth: "Reflection Depth",
       pipelineActivity: "Pipeline Activity",
@@ -817,19 +952,24 @@ var NorthStarBoardView = class extends import_obsidian5.ItemView {
     return names[category] || category;
   }
   openGoalModal() {
-    new NorthStarGoalModal(this.app, async (text, days) => {
-      await this.manager.setGoal(text, days);
+    new NorthStarGoalModal(this.app, async (text, days, context) => {
+      await this.manager.addGoal(text, days, context || void 0);
       new import_obsidian5.Notice("North Star goal locked in!");
       this.renderBoard();
     }).open();
   }
+  openEditContextModal(goal) {
+    new NorthStarEditContextModal(this.app, goal.context || "", async (context) => {
+      await this.manager.updateGoalContext(goal.id, context);
+      new import_obsidian5.Notice(context ? "Goal context updated!" : "Goal context cleared.");
+      this.renderBoard();
+    }).open();
+  }
   // ── Check-in note creation ──
-  async createCheckInNote(assessment) {
-    const goal = this.manager.getGoal();
-    if (!goal)
-      return;
+  async createCheckInNote(assessment, goal) {
     const folderPath = "NorthStar/check-ins";
-    const filePath = `${folderPath}/North Star Check-in \u2014 ${assessment.date}.md`;
+    const goalSuffix = this.manager.getGoals().length > 1 ? ` (${goal.id.slice(-6)})` : "";
+    const filePath = `${folderPath}/North Star Check-in \u2014 ${assessment.date}${goalSuffix}.md`;
     if (!this.app.vault.getAbstractFileByPath(folderPath)) {
       await this.app.vault.createFolder(folderPath);
     }
@@ -880,12 +1020,14 @@ ${momentumHtml}
     }
   }
   // ── Check-in note link (inline in chat) ──
-  renderCheckInLink(parent, assessment) {
-    const notePath = `NorthStar/check-ins/North Star Check-in \u2014 ${assessment.date}.md`;
+  renderCheckInLink(parent, assessment, goal) {
+    const goalSuffix = this.manager.getGoals().length > 1 ? ` (${goal.id.slice(-6)})` : "";
+    const notePath = `NorthStar/check-ins/North Star Check-in \u2014 ${assessment.date}${goalSuffix}.md`;
     const link = parent.createDiv({ cls: "acta-northstar-checkin-link" });
     const scoreClass = assessment.overallScore >= 70 ? "acta-northstar-score-good" : assessment.overallScore >= 40 ? "acta-northstar-score-mid" : "acta-northstar-score-low";
     link.createEl("span", { cls: `acta-northstar-checkin-score ${scoreClass}`, text: `${assessment.overallScore}/100` });
-    link.createEl("span", { cls: "acta-northstar-checkin-label", text: ` \u2014 Day ${assessment.dayNumber} Check-in` });
+    const goalLabel = this.manager.getGoals().length > 1 ? ` \u2014 ${goal.text.slice(0, 30)}${goal.text.length > 30 ? "..." : ""}` : "";
+    link.createEl("span", { cls: "acta-northstar-checkin-label", text: ` \u2014 Day ${assessment.dayNumber} Check-in${goalLabel}` });
     link.createEl("span", { cls: "acta-northstar-checkin-open", text: "Open note \u2197" });
     link.addEventListener("click", () => {
       this.app.workspace.openLinkText(notePath, "", false);
@@ -893,18 +1035,22 @@ ${momentumHtml}
   }
   // ── Tinker Chat ──
   renderTinkerChat() {
-    if (!this.boardEl)
+    if (!this.boardEl || !this.activeGoalId)
       return;
     const container = this.boardEl.createDiv({ cls: "acta-northstar-tinker-container" });
     container.createEl("h5", { text: "Tinker" });
     const messagesEl = container.createDiv({ cls: "acta-northstar-tinker-messages" });
     this.chatMessagesEl = messagesEl;
-    const messages = this.manager.getTinkerMessages();
+    const messages = this.manager.getTinkerMessages(this.activeGoalId);
     for (const msg of messages) {
       if (msg.assessmentId) {
-        const assessment = this.manager.getAssessments().find((a) => a.id === msg.assessmentId);
+        const assessments = this.manager.getAssessments(this.activeGoalId);
+        const assessment = assessments.find((a) => a.id === msg.assessmentId);
         if (assessment) {
-          this.renderCheckInLink(messagesEl, assessment);
+          const goalCtx = this.manager.getGoalContext(this.activeGoalId);
+          if (goalCtx) {
+            this.renderCheckInLink(messagesEl, assessment, goalCtx.goal);
+          }
         }
       }
       this.appendMessageBubble(messagesEl, msg);
@@ -913,8 +1059,13 @@ ${momentumHtml}
     const inputBox = inputContainer.createDiv({ cls: "acta-northstar-input-box" });
     const textarea = inputBox.createEl("textarea", {
       cls: "acta-northstar-input",
-      attr: { placeholder: "Ask Tinker about your goal...", rows: "3" }
+      attr: { placeholder: "Ask Tinker about your goal... (@ to mention files)", rows: "3" }
     });
+    this.fileChipsEl = inputBox.createDiv({ cls: "acta-northstar-file-chips" });
+    this.referencedFiles = [];
+    this.updateFileChips();
+    this.mentionDropdownEl = inputContainer.createDiv({ cls: "acta-northstar-mention-dropdown" });
+    this.mentionDropdownEl.style.display = "none";
     const toolbar = inputBox.createDiv({ cls: "acta-northstar-input-toolbar" });
     const models = [
       { value: "claude-haiku-4-5-20251001", label: "Haiku" },
@@ -949,10 +1100,38 @@ ${momentumHtml}
       if (!text || this.isSending)
         return;
       textarea.value = "";
-      this.sendTinkerMessage(text, messagesEl, textarea, sendBtn);
+      const filesToSend = [...this.referencedFiles];
+      this.referencedFiles = [];
+      this.updateFileChips();
+      this.sendTinkerMessage(text, messagesEl, textarea, sendBtn, filesToSend);
     };
     sendBtn.addEventListener("click", doSend);
+    textarea.addEventListener("input", () => {
+      this.handleMentionInput(textarea);
+    });
     textarea.addEventListener("keydown", (e) => {
+      if (this.mentionDropdownEl && this.mentionDropdownEl.style.display !== "none") {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          this.navigateMention(1);
+          return;
+        }
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          this.navigateMention(-1);
+          return;
+        }
+        if (e.key === "Enter") {
+          e.preventDefault();
+          this.selectMentionItem(textarea);
+          return;
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          this.closeMentionDropdown();
+          return;
+        }
+      }
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         doSend();
@@ -966,6 +1145,12 @@ ${momentumHtml}
     const bubble = container.createDiv({
       cls: `acta-northstar-tinker-bubble acta-northstar-tinker-bubble-${msg.role}`
     });
+    if (msg.role === "user" && msg.referencedFiles && msg.referencedFiles.length > 0) {
+      const refsEl = bubble.createDiv({ cls: "acta-northstar-bubble-refs" });
+      for (const ref of msg.referencedFiles) {
+        refsEl.createSpan({ cls: "acta-northstar-bubble-ref-chip", text: `@${ref.basename}` });
+      }
+    }
     const contentEl = bubble.createDiv({ cls: "acta-northstar-tinker-bubble-content" });
     import_obsidian5.MarkdownRenderer.renderMarkdown(msg.content, contentEl, "", this);
     return bubble;
@@ -1012,12 +1197,38 @@ ${momentumHtml}
     switch (toolName) {
       case "get_today_date": {
         const today = this.getLocalDateStr();
-        const dayNumber = this.manager.getDayNumber();
-        const existing = this.manager.getAssessments().find((a) => a.date === today);
+        const yesterday = this.getYesterdayDateStr();
+        const currentHour = new Date().getHours();
+        const requestedDate = toolInput.date || today;
+        const isYesterday = requestedDate === yesterday;
+        if (!this.activeGoalId) {
+          return { result: `Today is ${today}. No active goal selected.` };
+        }
+        const goalCtx = this.manager.getGoalContext(this.activeGoalId);
+        if (!goalCtx) {
+          return { result: `Today is ${today}. No active goal found.` };
+        }
+        const goal = goalCtx.goal;
+        const dayNumber = this.manager.getDayNumber(goal.id);
+        const adjustedDayNumber = isYesterday ? Math.max(1, dayNumber - 1) : dayNumber;
+        const existing = this.manager.getAssessments(goal.id).find((a) => a.date === requestedDate);
         const hasCheckin = !!existing;
-        return {
-          result: `Today is ${today}. Day ${dayNumber}. ${hasCheckin ? `A check-in already exists for today (score: ${existing.overallScore}/100). Running again will update it in place.` : "No check-in yet for today."}`
-        };
+        let dateResult = `Today is ${today}. Requested date: ${requestedDate}.`;
+        dateResult += `
+Goal "${goal.text.slice(0, 50)}": Day ${adjustedDayNumber}.`;
+        if (hasCheckin) {
+          dateResult += ` Check-in exists (score: ${existing.overallScore}/100). Running again will update it.`;
+        } else {
+          dateResult += ` No check-in yet.`;
+        }
+        if (isYesterday) {
+          dateResult += `
+NOTE: This is yesterday's date. The user is doing a retroactive check-in. This is allowed \u2014 better late than never. Give a brief, gentle reminder to try to be more punctual next time, but proceed with the check-in.`;
+        } else if (!toolInput.date && currentHour >= 0 && currentHour < 5) {
+          dateResult += `
+LATE-NIGHT NOTE: It's past midnight (${currentHour}:00). The user might want to check in for yesterday (${yesterday}) instead of today. If the user's message suggests they're reflecting on today's (now yesterday's) work, ask if they'd like to check in for ${yesterday}. Otherwise proceed with today.`;
+        }
+        return { result: dateResult };
       }
       case "observe_signals": {
         const dateStr = toolInput.date || this.getLocalDateStr();
@@ -1029,7 +1240,10 @@ ${momentumHtml}
           }
         });
         this.lastObservedSignals = signals;
-        const summary = `Observed for ${dateStr}: ${signals.tasks.length} tasks, ${signals.feedback.length} feedback, ${signals.reflections.length} reflections, ${signals.vaultActivity.filesModified} files modified`;
+        const priorityTasks = signals.tasks.filter((t) => t.priority);
+        const priorityCompleted = priorityTasks.filter((t) => t.completed).length;
+        const priorityDeepWork = priorityTasks.filter((t) => t.effort === "deep_work").length;
+        const summary = `Observed for ${dateStr}: ${priorityTasks.length} priority actions (${priorityCompleted} completed, ${priorityDeepWork} deep work), ${signals.feedback.length} feedback, ${signals.reflections.length} reflections, ${signals.vaultActivity.filesModified} files modified`;
         this.completeToolStep(stepEl, summary);
         messagesEl.scrollTop = messagesEl.scrollHeight;
         return { result: summary };
@@ -1039,14 +1253,22 @@ ${momentumHtml}
           return { result: "Error: No observed signals available. Call observe_signals first." };
         }
         const dateStr = toolInput.date || this.getLocalDateStr();
-        const stepEl = this.renderToolStep(messagesEl, "Running alignment assessment...");
-        const assessment = await this.agent.assessSignals(dateStr, this.lastObservedSignals);
+        if (!this.activeGoalId) {
+          return { result: "Error: No active goal selected." };
+        }
+        const goalCtx = this.manager.getGoalContext(this.activeGoalId);
+        if (!goalCtx) {
+          return { result: "Error: Active goal not found." };
+        }
+        const goal = goalCtx.goal;
+        const stepEl = this.renderToolStep(messagesEl, `Running assessment for "${goal.text.slice(0, 40)}${goal.text.length > 40 ? "..." : ""}"...`);
+        const assessment = await this.agent.assessSignals(goal.id, dateStr, this.lastObservedSignals);
         this.completeToolStep(stepEl, `Score: ${assessment.overallScore}/100`);
-        await this.createCheckInNote(assessment);
-        this.renderCheckInLink(messagesEl, assessment);
+        await this.createCheckInNote(assessment, goal);
+        this.renderCheckInLink(messagesEl, assessment, goal);
         messagesEl.scrollTop = messagesEl.scrollHeight;
-        const result = `Assessment complete. Score: ${assessment.overallScore}/100 (Day ${assessment.dayNumber}). Drift: ${assessment.driftIndicators.join("; ") || "None"}. Momentum: ${assessment.momentumIndicators.join("; ") || "None"}.`;
-        return { result, assessment };
+        const result = `Goal "${goal.text.slice(0, 50)}": ${assessment.overallScore}/100 (Day ${assessment.dayNumber}). Drift: ${assessment.driftIndicators.join("; ") || "None"}. Momentum: ${assessment.momentumIndicators.join("; ") || "None"}.`;
+        return { result, assessments: [assessment] };
       }
       case "save_conversation_summary": {
         const dateStr = toolInput.date || this.getLocalDateStr();
@@ -1056,7 +1278,9 @@ ${momentumHtml}
           return { result: "Error: No summary content provided." };
         }
         const folderPath = "NorthStar/check-ins";
-        const filePath = `${folderPath}/North Star Check-in \u2014 ${dateStr}.md`;
+        const activeGoalCtx = this.activeGoalId ? this.manager.getGoalContext(this.activeGoalId) : null;
+        const goalSuffix = activeGoalCtx && this.manager.getGoals().length > 1 ? ` (${activeGoalCtx.goal.id.slice(-6)})` : "";
+        const filePath = `${folderPath}/North Star Check-in \u2014 ${dateStr}${goalSuffix}.md`;
         const existingFile = this.app.vault.getAbstractFileByPath(filePath);
         if (existingFile && !overwrite) {
           const currentContent = await this.app.vault.read(existingFile);
@@ -1099,39 +1323,39 @@ ${summary}
           if (!this.app.vault.getAbstractFileByPath(folderPath)) {
             await this.app.vault.createFolder(folderPath);
           }
-          const goal = this.manager.getGoal();
-          const goalText = goal ? goal.text : "No goal set";
+          const goalText = activeGoalCtx ? activeGoalCtx.goal.text : "No goal set";
           const content = `**Goal:** ${goalText}
 ${summaryBlock}`;
           await this.app.vault.create(filePath, content);
           this.completeToolStep(stepEl, "Created check-in note with conversation notes");
         }
-        const latestAssessment = this.manager.getAssessments().find((a) => a.date === dateStr);
-        if (latestAssessment) {
-          this.renderCheckInLink(messagesEl, latestAssessment);
-        } else {
-          const notePath = filePath;
-          const link = messagesEl.createDiv({ cls: "acta-northstar-checkin-link" });
-          link.createEl("span", { cls: "acta-northstar-checkin-label", text: `Check-in \u2014 ${dateStr}` });
-          link.createEl("span", { cls: "acta-northstar-checkin-open", text: "Open note \u2197" });
-          link.addEventListener("click", () => {
-            this.app.workspace.openLinkText(notePath, "", false);
-          });
+        if (activeGoalCtx) {
+          const latestAssessment = this.manager.getAssessments(activeGoalCtx.goal.id).find((a) => a.date === dateStr);
+          if (latestAssessment) {
+            this.renderCheckInLink(messagesEl, latestAssessment, activeGoalCtx.goal);
+          }
         }
         messagesEl.scrollTop = messagesEl.scrollHeight;
         return { result: `Conversation summary saved to check-in note for ${dateStr}.` };
       }
       case "get_assessment_history": {
         const count = toolInput.count || 5;
-        const assessments = this.manager.getAssessments();
+        if (!this.activeGoalId) {
+          return { result: "No active goal selected." };
+        }
+        const goalCtx = this.manager.getGoalContext(this.activeGoalId);
+        if (!goalCtx) {
+          return { result: "Active goal not found." };
+        }
+        const assessments = this.manager.getAssessments(this.activeGoalId);
         const recent = assessments.slice(-count);
         if (recent.length === 0) {
-          return { result: "No assessment history available." };
+          return { result: `Goal "${goalCtx.goal.text.slice(0, 50)}": No assessment history.` };
         }
         const lines = recent.map(
-          (a) => `Day ${a.dayNumber} (${a.date}): ${a.overallScore}/100`
+          (a) => `  Day ${a.dayNumber} (${a.date}): ${a.overallScore}/100`
         );
-        return { result: `Assessment history (last ${recent.length}):
+        return { result: `Goal "${goalCtx.goal.text.slice(0, 50)}" (last ${recent.length}):
 ${lines.join("\n")}` };
       }
       default:
@@ -1139,22 +1363,53 @@ ${lines.join("\n")}` };
     }
   }
   // ── Agentic loop ──
-  async sendTinkerMessage(text, messagesEl, textarea, sendBtn) {
+  async sendTinkerMessage(text, messagesEl, textarea, sendBtn, referencedFiles = []) {
+    if (!this.activeGoalId)
+      return;
+    const goalId = this.activeGoalId;
     this.isSending = true;
     textarea.disabled = true;
     sendBtn.disabled = true;
     sendBtn.addClass("is-disabled");
-    const userMsg = { role: "user", content: text, timestamp: Date.now() };
-    await this.manager.addTinkerMessage(userMsg);
+    const refMeta = referencedFiles.length > 0 ? referencedFiles.map((f) => ({ path: f.path, basename: f.basename })) : void 0;
+    const userMsg = { role: "user", content: text, timestamp: Date.now(), referencedFiles: refMeta };
+    await this.manager.addTinkerMessage(goalId, userMsg);
     this.appendMessageBubble(messagesEl, userMsg);
     let typingEl = this.addTypingIndicator(messagesEl);
-    let producedAssessment = null;
+    let producedAssessments = [];
     try {
       const systemPrompt = this.buildTinkerSystemPrompt();
-      const apiMessages = this.manager.getTinkerMessages().map((m) => ({
-        role: m.role,
-        content: m.content
-      }));
+      const MAX_FILE_SIZE = 50 * 1024;
+      const persistedMessages = this.manager.getTinkerMessages(goalId);
+      const apiMessages = [];
+      for (const m of persistedMessages) {
+        let content = m.content;
+        if (m.role === "user" && m.referencedFiles && m.referencedFiles.length > 0) {
+          const fileBlocks = [];
+          for (const ref of m.referencedFiles) {
+            const file = this.app.vault.getAbstractFileByPath(ref.path);
+            if (file && file instanceof import_obsidian5.TFile) {
+              try {
+                let fileContent = await this.app.vault.cachedRead(file);
+                if (fileContent.length > MAX_FILE_SIZE) {
+                  fileContent = fileContent.substring(0, MAX_FILE_SIZE) + "\n... (truncated)";
+                }
+                fileBlocks.push(`<referenced_file path="${ref.path}">
+${fileContent}
+</referenced_file>`);
+              } catch (e) {
+                fileBlocks.push(`<referenced_file path="${ref.path}">
+[Error reading file]
+</referenced_file>`);
+              }
+            }
+          }
+          if (fileBlocks.length > 0) {
+            content = fileBlocks.join("\n\n") + "\n\n" + content;
+          }
+        }
+        apiMessages.push({ role: m.role, content });
+      }
       let maxIterations = 10;
       while (maxIterations-- > 0) {
         const response = await this.llmClient.chatWithTools(systemPrompt, apiMessages, TOOL_DEFINITIONS);
@@ -1168,9 +1423,9 @@ ${lines.join("\n")}` };
               role: "assistant",
               content: finalText,
               timestamp: Date.now(),
-              assessmentId: producedAssessment == null ? void 0 : producedAssessment.id
+              assessmentId: producedAssessments.length > 0 ? producedAssessments[0].id : void 0
             };
-            await this.manager.addTinkerMessage(assistantMsg);
+            await this.manager.addTinkerMessage(goalId, assistantMsg);
             this.appendMessageBubble(messagesEl, assistantMsg);
           }
           break;
@@ -1183,13 +1438,13 @@ ${lines.join("\n")}` };
           const toolResults = [];
           for (const toolBlock of toolUseBlocks) {
             try {
-              const { result, assessment } = await this.executeTool(
+              const { result, assessments } = await this.executeTool(
                 toolBlock.name,
                 toolBlock.input,
                 messagesEl
               );
-              if (assessment) {
-                producedAssessment = assessment;
+              if (assessments) {
+                producedAssessments = assessments;
               }
               toolResults.push({
                 type: "tool_result",
@@ -1226,13 +1481,137 @@ ${lines.join("\n")}` };
     sendBtn.removeClass("is-disabled");
     textarea.focus();
   }
+  // ── @ Mention handling ──
+  handleMentionInput(textarea) {
+    const cursorPos = textarea.selectionStart;
+    const text = textarea.value.substring(0, cursorPos);
+    let atIndex = -1;
+    for (let i = text.length - 1; i >= 0; i--) {
+      if (text[i] === "@") {
+        if (i === 0 || /\s/.test(text[i - 1])) {
+          atIndex = i;
+        }
+        break;
+      }
+      if (text[i] === "\n")
+        break;
+    }
+    if (atIndex === -1) {
+      this.closeMentionDropdown();
+      return;
+    }
+    this.mentionStartIndex = atIndex;
+    this.mentionQuery = text.substring(atIndex + 1);
+    this.showMentionDropdown(textarea);
+  }
+  showMentionDropdown(textarea) {
+    if (!this.mentionDropdownEl)
+      return;
+    const query = this.mentionQuery.toLowerCase();
+    const allFiles = this.app.vault.getMarkdownFiles();
+    const referencedPaths = new Set(this.referencedFiles.map((f) => f.path));
+    this.mentionFilteredFiles = allFiles.filter((f) => !referencedPaths.has(f.path)).filter((f) => {
+      if (!query)
+        return true;
+      return f.basename.toLowerCase().includes(query) || f.path.toLowerCase().includes(query);
+    }).slice(0, 10);
+    if (this.mentionFilteredFiles.length === 0) {
+      this.closeMentionDropdown();
+      return;
+    }
+    this.mentionSelectedIndex = 0;
+    this.mentionDropdownEl.empty();
+    this.mentionDropdownEl.style.display = "block";
+    for (let i = 0; i < this.mentionFilteredFiles.length; i++) {
+      const file = this.mentionFilteredFiles[i];
+      const item = this.mentionDropdownEl.createDiv({
+        cls: `acta-northstar-mention-item${i === 0 ? " is-selected" : ""}`
+      });
+      item.createSpan({ cls: "acta-northstar-mention-name", text: file.basename });
+      const folder = file.path.substring(0, file.path.length - file.name.length - 1);
+      if (folder) {
+        item.createSpan({ cls: "acta-northstar-mention-path", text: folder });
+      }
+      item.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.mentionSelectedIndex = i;
+        this.selectMentionItem(textarea);
+      });
+    }
+  }
+  navigateMention(direction) {
+    if (this.mentionFilteredFiles.length === 0)
+      return;
+    this.mentionSelectedIndex = (this.mentionSelectedIndex + direction + this.mentionFilteredFiles.length) % this.mentionFilteredFiles.length;
+    this.updateMentionSelection();
+  }
+  updateMentionSelection() {
+    if (!this.mentionDropdownEl)
+      return;
+    const items = this.mentionDropdownEl.querySelectorAll(".acta-northstar-mention-item");
+    items.forEach((el, i) => {
+      if (i === this.mentionSelectedIndex) {
+        el.addClass("is-selected");
+        el.scrollIntoView({ block: "nearest" });
+      } else {
+        el.removeClass("is-selected");
+      }
+    });
+  }
+  selectMentionItem(textarea) {
+    const file = this.mentionFilteredFiles[this.mentionSelectedIndex];
+    if (!file)
+      return;
+    this.referencedFiles.push(file);
+    this.updateFileChips();
+    const before = textarea.value.substring(0, this.mentionStartIndex);
+    const after = textarea.value.substring(textarea.selectionStart);
+    textarea.value = before + after;
+    textarea.selectionStart = textarea.selectionEnd = before.length;
+    this.closeMentionDropdown();
+    textarea.focus();
+  }
+  closeMentionDropdown() {
+    if (this.mentionDropdownEl) {
+      this.mentionDropdownEl.style.display = "none";
+      this.mentionDropdownEl.empty();
+    }
+    this.mentionQuery = "";
+    this.mentionStartIndex = -1;
+    this.mentionSelectedIndex = 0;
+    this.mentionFilteredFiles = [];
+  }
+  updateFileChips() {
+    if (!this.fileChipsEl)
+      return;
+    this.fileChipsEl.empty();
+    if (this.referencedFiles.length === 0) {
+      this.fileChipsEl.style.display = "none";
+      return;
+    }
+    this.fileChipsEl.style.display = "flex";
+    for (let i = 0; i < this.referencedFiles.length; i++) {
+      const file = this.referencedFiles[i];
+      const chip = this.fileChipsEl.createDiv({ cls: "acta-northstar-file-chip" });
+      chip.createSpan({ text: file.basename });
+      const removeBtn = chip.createSpan({ cls: "acta-northstar-file-chip-remove", text: "\xD7" });
+      removeBtn.addEventListener("click", () => {
+        this.referencedFiles.splice(i, 1);
+        this.updateFileChips();
+      });
+    }
+  }
   buildTinkerSystemPrompt() {
-    const goal = this.manager.getGoal();
-    if (!goal)
-      return "No active goal.";
-    const dayNumber = this.manager.getDayNumber();
-    const daysLeft = this.manager.getDaysLeft();
-    const latest = this.manager.getLatestAssessment();
+    if (!this.activeGoalId)
+      return "No active goals.";
+    const goalCtx = this.manager.getGoalContext(this.activeGoalId);
+    if (!goalCtx)
+      return "No active goals.";
+    const goal = goalCtx.goal;
+    const dayNumber = this.manager.getDayNumber(goal.id);
+    const daysLeft = this.manager.getDaysLeft(goal.id);
+    const latest = this.manager.getLatestAssessment(goal.id);
     let assessmentBlock = "No assessment yet.";
     if (latest) {
       const breakdownLines = latest.signalBreakdown.map(
@@ -1248,7 +1627,16 @@ ${driftLines}
 Momentum:
 ${momentumLines}`;
     }
-    return `You are Tinker, a goal-alignment coach embedded in North Star.
+    const contextBlock = goal.context ? `
+Reference Context:
+${goal.context}
+` : "";
+    const goalBlock = `### Goal: "${goal.text}"
+Day ${dayNumber} of ${goal.timeWindowDays} | Phase: ${goal.currentPhase} | ${daysLeft}d left
+${contextBlock}
+Latest Assessment:
+${assessmentBlock}`;
+    return `You are Tinker, a goal-alignment coach embedded in North Star. This conversation is scoped to a single goal.
 
 ## Your Role
 - Challenge assumptions, surface patterns, pressure-test decisions
@@ -1258,12 +1646,18 @@ ${momentumLines}`;
 
 ## Tools Available
 When the user asks for a "check-in", "how am I doing", "run a cycle", or similar:
-1. First call get_today_date to get today's date and check if a check-in exists
+1. First call get_today_date to get today's date and check if a check-in exists. If the user asks for a specific date (e.g. "check in for yesterday"), pass that date to get_today_date.
 2. Then call observe_signals with that date to collect data
-3. Then call run_assessment with that date to score alignment (this updates any existing check-in in place)
+3. Then call run_assessment with that date to score alignment
 4. Then provide your commentary and coaching
 
-IMPORTANT: Always call get_today_date first and pass its date to the other tools. This ensures consistent dates and proper updates. If a check-in already exists for today, tell the user you're updating it.
+IMPORTANT: Always call get_today_date first and pass its date to the other tools. This ensures consistent dates and proper updates. If a check-in already exists for that date, tell the user you're updating it.
+
+## Late & Retroactive Check-ins
+- If the user asks to check in for yesterday, or it's past midnight and they're reflecting on the day that just ended: ALLOW IT. Better late than never.
+- When doing a retroactive check-in, give a brief, warm reminder like: "Let's do the check-in for yesterday \u2014 but let's try to be more punctual next time so we capture things while they're fresh."
+- Do NOT refuse or lecture. Just gently note it and proceed.
+- If it's past midnight (the get_today_date tool will tell you), proactively ask whether they want to check in for yesterday or today.
 
 Use get_assessment_history when the user asks about trends or progress over time.
 
@@ -1278,12 +1672,13 @@ IMPORTANT for save_conversation_summary:
 
 Do NOT call tools unless the conversation warrants it. For regular coaching questions, just respond with text.
 
-## Current Context
-Goal: "${goal.text}"
-Day ${dayNumber} of ${goal.timeWindowDays} | Phase: ${goal.currentPhase} | ${daysLeft}d left
+## Current Goal
+${goalBlock}
 
-## Latest Assessment
-${assessmentBlock}
+## Priority Actions (IMPORTANT)
+The system extracts tasks from the "Today's Priority Actions" section in the daily note. The assessment ONLY evaluates these priority tasks \u2014 not the full task board. When coaching and commenting on check-in results, focus exclusively on the priority actions. Do NOT mention the total task count or non-priority tasks. Only discuss how well the user executed on their chosen priority actions for the day.
+
+Deep work includes any sustained focused work: coding, reading papers, research, studying, designing, writing \u2014 not just "development". If a priority task has a time annotation (like @10PM-1AM), that's a deep work session.
 
 ## What Tinker never does
 - No file/vault operations
@@ -1302,7 +1697,7 @@ var ActaTaskSettingTab = class extends import_obsidian6.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: "Acta Task Settings" });
+    containerEl.createEl("h2", { text: "Northstar Settings" });
     containerEl.createEl("p", {
       text: "Tasks with inline hashtags (e.g. - [ ] #people do something) are automatically tracked on the board.",
       cls: "setting-item-description"
@@ -2116,115 +2511,185 @@ var DEFAULT_POLICY = {
   version: 1
 };
 var DEFAULT_NORTHSTAR_DATA = {
-  goal: null,
-  policy: { ...DEFAULT_POLICY, signalWeights: { ...DEFAULT_SIGNAL_WEIGHTS }, milestones: [] },
-  assessments: [],
-  archivedGoals: [],
-  tinkerMessages: []
+  goalContexts: [],
+  archivedGoals: []
 };
 var TIME_ANNOTATION_REGEX = /@(\d{1,2}(?::?\d{2})?)\s*(?:AM|PM|am|pm)?\s*[-–]\s*(\d{1,2}(?::?\d{2})?)\s*(?:AM|PM|am|pm)?/;
 
 // src/northStarManager.ts
+var MAX_GOALS = 2;
 var NorthStarManager = class {
   constructor(app, settings, data, saveData) {
     this.app = app;
     this.settings = settings;
     this.data = data;
     this.saveData = saveData;
+    this.migrateTinkerMessages();
   }
   updateSettings(settings) {
     this.settings = settings;
   }
   updateData(data) {
     this.data = data;
+    this.migrateTinkerMessages();
   }
-  getGoal() {
-    return this.data.goal;
+  /** Migrate legacy shared tinkerMessages into the first goal context */
+  migrateTinkerMessages() {
+    for (const gc of this.data.goalContexts) {
+      if (!gc.tinkerMessages)
+        gc.tinkerMessages = [];
+    }
+    if (this.data.tinkerMessages && this.data.tinkerMessages.length > 0) {
+      if (this.data.goalContexts.length > 0 && this.data.goalContexts[0].tinkerMessages.length === 0) {
+        this.data.goalContexts[0].tinkerMessages = [...this.data.tinkerMessages];
+      }
+      delete this.data.tinkerMessages;
+      this.saveData();
+    }
   }
-  getPolicy() {
-    return this.data.policy;
+  // ── Active goal persistence ──
+  getActiveGoalId() {
+    var _a;
+    return (_a = this.data.activeGoalId) != null ? _a : null;
   }
-  getAssessments() {
-    return this.data.assessments;
+  async setActiveGoalId(goalId) {
+    this.data.activeGoalId = goalId;
+    await this.saveData();
   }
-  getLatestAssessment() {
-    if (this.data.assessments.length === 0)
+  // ── Goal access ──
+  getGoals() {
+    return this.data.goalContexts.map((gc) => gc.goal);
+  }
+  getGoalContext(goalId) {
+    var _a;
+    return (_a = this.data.goalContexts.find((gc) => gc.goal.id === goalId)) != null ? _a : null;
+  }
+  getGoalContexts() {
+    return this.data.goalContexts;
+  }
+  getPolicy(goalId) {
+    const ctx = this.getGoalContext(goalId);
+    if (!ctx)
+      return { ...DEFAULT_POLICY, signalWeights: { ...DEFAULT_SIGNAL_WEIGHTS }, milestones: [] };
+    return ctx.policy;
+  }
+  getAssessments(goalId) {
+    const ctx = this.getGoalContext(goalId);
+    if (!ctx)
+      return [];
+    return ctx.assessments;
+  }
+  getAllAssessments() {
+    return this.data.goalContexts.flatMap((gc) => gc.assessments);
+  }
+  getLatestAssessment(goalId) {
+    const assessments = this.getAssessments(goalId);
+    if (assessments.length === 0)
       return null;
-    return this.data.assessments[this.data.assessments.length - 1];
+    return assessments[assessments.length - 1];
   }
-  getDayNumber() {
-    const goal = this.data.goal;
-    if (!goal)
+  getDayNumber(goalId) {
+    const ctx = this.getGoalContext(goalId);
+    if (!ctx)
       return 0;
-    const lockedDate = new Date(goal.lockedAt);
+    const lockedDate = new Date(ctx.goal.lockedAt);
     lockedDate.setHours(0, 0, 0, 0);
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     const diffMs = now.getTime() - lockedDate.getTime();
     return Math.floor(diffMs / (1e3 * 60 * 60 * 24)) + 1;
   }
-  getDaysLeft() {
-    const goal = this.data.goal;
-    if (!goal)
+  getDaysLeft(goalId) {
+    const ctx = this.getGoalContext(goalId);
+    if (!ctx)
       return 0;
-    return Math.max(0, goal.timeWindowDays - this.getDayNumber() + 1);
+    return Math.max(0, ctx.goal.timeWindowDays - this.getDayNumber(goalId) + 1);
   }
-  async setGoal(text, timeWindowDays) {
-    if (this.data.goal) {
-      this.data.goal.active = false;
-      this.data.archivedGoals.push(this.data.goal);
+  async addGoal(text, timeWindowDays, context) {
+    if (this.data.goalContexts.length >= MAX_GOALS) {
+      throw new Error(`Maximum of ${MAX_GOALS} concurrent goals allowed`);
     }
     const goal = {
       id: `ns-${Date.now()}`,
       text,
+      ...context ? { context } : {},
       timeWindowDays,
       lockedAt: Date.now(),
       currentPhase: "exploration",
       active: true
     };
-    this.data.goal = goal;
-    this.data.policy = {
-      signalWeights: { ...DEFAULT_SIGNAL_WEIGHTS },
-      checkInPrompts: [],
-      milestones: [],
-      version: 1
+    const ctx = {
+      goal,
+      policy: {
+        signalWeights: { ...DEFAULT_SIGNAL_WEIGHTS },
+        checkInPrompts: [],
+        milestones: [],
+        version: 1
+      },
+      assessments: [],
+      tinkerMessages: []
     };
-    this.data.assessments = [];
-    this.data.tinkerMessages = [];
+    this.data.goalContexts.push(ctx);
     await this.saveData();
     return goal;
   }
-  async addAssessment(assessment) {
-    const existingIndex = this.data.assessments.findIndex(
+  async addAssessment(goalId, assessment) {
+    const ctx = this.getGoalContext(goalId);
+    if (!ctx)
+      throw new Error(`Goal context not found for goalId: ${goalId}`);
+    const existingIndex = ctx.assessments.findIndex(
       (a) => a.date === assessment.date
     );
     if (existingIndex >= 0) {
-      this.data.assessments[existingIndex] = assessment;
+      ctx.assessments[existingIndex] = assessment;
     } else {
-      this.data.assessments.push(assessment);
+      ctx.assessments.push(assessment);
     }
     await this.saveData();
   }
-  async archiveGoal() {
-    if (!this.data.goal)
+  async archiveGoal(goalId) {
+    const idx = this.data.goalContexts.findIndex((gc) => gc.goal.id === goalId);
+    if (idx < 0)
       return;
-    this.data.goal.active = false;
-    this.data.archivedGoals.push(this.data.goal);
-    this.data.goal = null;
-    this.data.assessments = [];
-    this.data.tinkerMessages = [];
-    this.data.policy = { ...DEFAULT_POLICY, signalWeights: { ...DEFAULT_SIGNAL_WEIGHTS }, milestones: [] };
+    const ctx = this.data.goalContexts[idx];
+    ctx.goal.active = false;
+    this.data.archivedGoals.push(ctx.goal);
+    this.data.goalContexts.splice(idx, 1);
     await this.saveData();
   }
-  getTinkerMessages() {
-    return this.data.tinkerMessages;
-  }
-  async addTinkerMessage(msg) {
-    this.data.tinkerMessages.push(msg);
+  async updateGoalContext(goalId, context) {
+    const ctx = this.getGoalContext(goalId);
+    if (!ctx)
+      throw new Error(`Goal context not found for goalId: ${goalId}`);
+    if (context) {
+      ctx.goal.context = context;
+    } else {
+      delete ctx.goal.context;
+    }
     await this.saveData();
   }
-  async clearTinkerMessages() {
-    this.data.tinkerMessages = [];
+  canAddGoal() {
+    return this.data.goalContexts.length < MAX_GOALS;
+  }
+  // ── Tinker messages (per-goal) ──
+  getTinkerMessages(goalId) {
+    const ctx = this.getGoalContext(goalId);
+    if (!ctx)
+      return [];
+    return ctx.tinkerMessages;
+  }
+  async addTinkerMessage(goalId, msg) {
+    const ctx = this.getGoalContext(goalId);
+    if (!ctx)
+      return;
+    ctx.tinkerMessages.push(msg);
+    await this.saveData();
+  }
+  async clearTinkerMessages(goalId) {
+    const ctx = this.getGoalContext(goalId);
+    if (!ctx)
+      return;
+    ctx.tinkerMessages = [];
     await this.saveData();
   }
 };
@@ -2241,7 +2706,7 @@ var NorthStarLlmClient = class {
   async chat(systemPrompt, messages) {
     const apiKey = this.settings.anthropicApiKey;
     if (!apiKey) {
-      throw new Error("Anthropic API key not set. Go to Settings \u2192 Acta Task \u2192 North Star to add it.");
+      throw new Error("Anthropic API key not set. Go to Settings \u2192 Northstar \u2192 North Star to add it.");
     }
     let response;
     try {
@@ -2265,7 +2730,7 @@ var NorthStarLlmClient = class {
       throw new Error(`Network error: ${e instanceof Error ? e.message : String(e)}`);
     }
     if (response.status === 401) {
-      throw new Error("Invalid API key. Check your key in Settings \u2192 Acta Task \u2192 North Star.");
+      throw new Error("Invalid API key. Check your key in Settings \u2192 Northstar \u2192 North Star.");
     }
     if (response.status !== 200) {
       throw new Error(`API error (${response.status}): ${response.text}`);
@@ -2279,7 +2744,7 @@ var NorthStarLlmClient = class {
   async chatWithTools(systemPrompt, messages, tools) {
     const apiKey = this.settings.anthropicApiKey;
     if (!apiKey) {
-      throw new Error("Anthropic API key not set. Go to Settings \u2192 Acta Task \u2192 North Star to add it.");
+      throw new Error("Anthropic API key not set. Go to Settings \u2192 Northstar \u2192 North Star to add it.");
     }
     let response;
     try {
@@ -2304,7 +2769,7 @@ var NorthStarLlmClient = class {
       throw new Error(`Network error: ${e instanceof Error ? e.message : String(e)}`);
     }
     if (response.status === 401) {
-      throw new Error("Invalid API key. Check your key in Settings \u2192 Acta Task \u2192 North Star.");
+      throw new Error("Invalid API key. Check your key in Settings \u2192 Northstar \u2192 North Star.");
     }
     if (response.status !== 200) {
       throw new Error(`API error (${response.status}): ${response.text}`);
@@ -2318,7 +2783,7 @@ var NorthStarLlmClient = class {
   async call(systemPrompt, userMessage) {
     const apiKey = this.settings.anthropicApiKey;
     if (!apiKey) {
-      throw new Error("Anthropic API key not set. Go to Settings \u2192 Acta Task \u2192 North Star to add it.");
+      throw new Error("Anthropic API key not set. Go to Settings \u2192 Northstar \u2192 North Star to add it.");
     }
     let response;
     try {
@@ -2342,7 +2807,7 @@ var NorthStarLlmClient = class {
       throw new Error(`Network error: ${e instanceof Error ? e.message : String(e)}`);
     }
     if (response.status === 401) {
-      throw new Error("Invalid API key. Check your key in Settings \u2192 Acta Task \u2192 North Star.");
+      throw new Error("Invalid API key. Check your key in Settings \u2192 Northstar \u2192 North Star.");
     }
     if (response.status !== 200) {
       throw new Error(`API error (${response.status}): ${response.text}`);
@@ -2373,11 +2838,11 @@ var NorthStarObserver = class {
     this.negativeFeedbackData = negativeFeedbackData;
   }
   async observe(dateStr, onStep) {
-    onStep == null ? void 0 : onStep("tasks", "Scanning task board...");
-    const tasks = this.extractTaskSignals(dateStr);
+    onStep == null ? void 0 : onStep("tasks", "Scanning daily note for priority actions...");
+    const tasks = await this.extractPriorityTasksFromNote(dateStr);
     const completedCount = tasks.filter((t) => t.completed).length;
     const deepWorkCount = tasks.filter((t) => t.effort === "deep_work").length;
-    onStep == null ? void 0 : onStep("tasks", `Found ${tasks.length} tasks (${completedCount} completed, ${deepWorkCount} deep work)`);
+    onStep == null ? void 0 : onStep("tasks", `Found ${tasks.length} priority actions (${completedCount} completed, ${deepWorkCount} deep work)`);
     onStep == null ? void 0 : onStep("positive-feedback", "Scanning positive feedback...");
     const positiveFeedback = this.extractPositiveFeedbackSignals(dateStr);
     onStep == null ? void 0 : onStep("positive-feedback", `Found ${positiveFeedback.length} positive feedback entries`);
@@ -2399,27 +2864,60 @@ var NorthStarObserver = class {
       vaultActivity
     };
   }
-  extractTaskSignals(dateStr) {
+  /**
+   * Read priority tasks directly from the daily note's "Today's Priority Actions" section.
+   * This is the single source of truth — no task board indirection.
+   */
+  async extractPriorityTasksFromNote(dateStr) {
     const signals = [];
     const compactDate = dateStr.replace(/-/g, "");
-    for (const task of Object.values(this.taskData.addedTasks)) {
-      if (!task.filePath.includes(compactDate))
+    const files = this.app.vault.getMarkdownFiles();
+    for (const file of files) {
+      if (!file.path.includes(compactDate))
         continue;
-      const timeMatch = task.text.match(TIME_ANNOTATION_REGEX);
-      let durationMin;
-      let timeAnnotation;
-      if (timeMatch) {
-        timeAnnotation = timeMatch[0];
-        durationMin = this.parseDuration(timeMatch[1], timeMatch[2]);
+      const content = await this.app.vault.cachedRead(file);
+      const lines = content.split("\n");
+      let inPrioritySection = false;
+      for (const line of lines) {
+        if (/^#{1,6}\s+Today'?s?\s+Priority\s+Actions/i.test(line)) {
+          inPrioritySection = true;
+          continue;
+        }
+        if (inPrioritySection && /^#{1,6}\s+/.test(line)) {
+          break;
+        }
+        if (inPrioritySection) {
+          const checkboxMatch = line.match(/^\s*-\s+\[([ xX])\]\s+(.*)/i);
+          if (checkboxMatch) {
+            const completed = checkboxMatch[1].toLowerCase() === "x";
+            const fullText = checkboxMatch[2];
+            const timeMatch = fullText.match(TIME_ANNOTATION_REGEX);
+            let timeAnnotation;
+            let durationMin;
+            if (timeMatch) {
+              timeAnnotation = timeMatch[0];
+              durationMin = this.parseDuration(timeMatch[1], timeMatch[2]);
+            }
+            const tags = [];
+            const tagMatches = fullText.matchAll(/#(\w+)/g);
+            for (const m of tagMatches) {
+              tags.push(`#${m[1]}`);
+            }
+            const title = fullText.replace(TIME_ANNOTATION_REGEX, "").replace(/\[\[.*?\]\]/g, "").replace(/\[.*?\]\(.*?\)/g, "").replace(/\s+/g, " ").trim();
+            if (title.length > 0) {
+              signals.push({
+                title,
+                tags,
+                completed,
+                timeAnnotation,
+                durationMin,
+                effort: timeMatch ? "deep_work" : "quick_action",
+                priority: true
+              });
+            }
+          }
+        }
       }
-      signals.push({
-        title: task.text,
-        tags: task.tags,
-        completed: task.completed,
-        timeAnnotation,
-        durationMin,
-        effort: timeMatch ? "deep_work" : "quick_action"
-      });
     }
     return signals;
   }
@@ -2488,6 +2986,25 @@ var NorthStarObserver = class {
           }
         }
       }
+      let inReflectionSection = false;
+      for (const line of lines) {
+        if (/^#{1,6}\s+Reflection/i.test(line)) {
+          inReflectionSection = true;
+          continue;
+        }
+        if (inReflectionSection && /^#{1,6}\s+/.test(line)) {
+          break;
+        }
+        if (inReflectionSection) {
+          const cleanText = line.replace(/^[\s]*[-*]\s+/, "").replace(/#\w+/g, "").trim();
+          if (cleanText.length > 0) {
+            reflections.push({
+              text: cleanText,
+              filePath: file.path
+            });
+          }
+        }
+      }
     }
     return reflections;
   }
@@ -2524,32 +3041,31 @@ var NorthStarAgent = class {
       onProgress == null ? void 0 : onProgress(step, isRunning ? "running" : "done", detail);
     });
   }
-  async assessSignals(dateStr, signals) {
-    const goal = this.manager.getGoal();
-    if (!goal)
-      throw new Error("No active goal set");
-    const policy = this.manager.getPolicy();
-    const dayNumber = this.manager.getDayNumber();
-    const assessment = await this.assess(goal, signals, policy, dayNumber, dateStr);
-    await this.manager.addAssessment(assessment);
+  async assessSignals(goalId, dateStr, signals) {
+    const ctx = this.manager.getGoalContext(goalId);
+    if (!ctx)
+      throw new Error(`No goal context found for goalId: ${goalId}`);
+    const dayNumber = this.manager.getDayNumber(goalId);
+    const assessment = await this.assess(ctx.goal, signals, ctx.policy, dayNumber, dateStr);
+    assessment.goalId = goalId;
+    await this.manager.addAssessment(goalId, assessment);
     return assessment;
   }
-  async runCycle(dateStr, onProgress) {
-    const goal = this.manager.getGoal();
-    if (!goal) {
-      throw new Error("No active goal set");
-    }
-    const policy = this.manager.getPolicy();
-    const dayNumber = this.manager.getDayNumber();
+  async runCycle(goalId, dateStr, onProgress) {
+    const ctx = this.manager.getGoalContext(goalId);
+    if (!ctx)
+      throw new Error(`No goal context found for goalId: ${goalId}`);
+    const dayNumber = this.manager.getDayNumber(goalId);
     const signals = await this.observer.observe(dateStr, (step, detail) => {
       const isRunning = detail.startsWith("Scanning") || detail.startsWith("Checking");
       onProgress == null ? void 0 : onProgress(step, isRunning ? "running" : "done", detail);
     });
     onProgress == null ? void 0 : onProgress("assess", "running", "Sending signals to Claude for assessment...");
-    const assessment = await this.assess(goal, signals, policy, dayNumber, dateStr);
+    const assessment = await this.assess(ctx.goal, signals, ctx.policy, dayNumber, dateStr);
+    assessment.goalId = goalId;
     onProgress == null ? void 0 : onProgress("assess", "done", `Assessment complete \u2014 score: ${assessment.overallScore}/100`);
     onProgress == null ? void 0 : onProgress("save", "running", "Saving assessment...");
-    await this.manager.addAssessment(assessment);
+    await this.manager.addAssessment(goalId, assessment);
     onProgress == null ? void 0 : onProgress("save", "done", "Assessment saved to data.json");
     return assessment;
   }
@@ -2557,12 +3073,14 @@ var NorthStarAgent = class {
     const systemPrompt = this.buildAssessSystemPrompt();
     const userMessage = this.buildAssessUserMessage(goal, signals, policy, dayNumber);
     const rawResponse = await this.llmClient.call(systemPrompt, userMessage);
-    return this.parseAssessResponse(rawResponse, dateStr, dayNumber, signals, policy.version);
+    return this.parseAssessResponse(rawResponse, dateStr, dayNumber, signals, policy.version, goal.id);
   }
   buildAssessSystemPrompt() {
     return `You are an alignment assessment agent for a personal goal-tracking system called North Star.
 
-Your job: Given a user's locked goal, today's activity signals, and the current measurement policy (signal weights), produce a structured assessment of how aligned today's work was with the goal.
+Your job: Given a user's locked goal, today's priority actions, and the current measurement policy (signal weights), produce a structured assessment of how aligned today's work was with the goal.
+
+IMPORTANT: You are ONLY evaluating the user's Priority Actions \u2014 these are the tasks they deliberately chose to focus on today. Ignore any other tasks. Judge completion and effort based solely on these priority actions.
 
 You MUST respond with valid JSON only \u2014 no markdown, no explanation outside the JSON. The JSON must match this schema:
 
@@ -2588,15 +3106,22 @@ Rules:
 - Drift indicators should cite concrete evidence of misalignment
 - Momentum indicators should cite concrete evidence of progress
 - If signals are empty for a category, score it low but explain why
-- Be honest and calibrated \u2014 don't inflate scores`;
+- Be honest and calibrated \u2014 don't inflate scores
+- goalDirectDeepWork includes ANY sustained focused work toward the goal: coding, reading papers, research, studying, designing, writing, deep thinking sessions \u2014 not just "development" or "coding". Any task with a time annotation (e.g. @10PM-1AM) represents a focused work block and counts as deep work.
+- taskCompletion is based ONLY on the priority actions listed \u2014 how many were completed vs planned. Do NOT count non-priority tasks.`;
   }
   buildAssessUserMessage(goal, signals, policy, dayNumber) {
+    const priorityTasks = signals.tasks.filter((t) => t.priority);
+    const contextSection = goal.context ? `
+## Goal Context
+${goal.context}
+` : "";
     return `## Locked Goal
 "${goal.text}"
 Time window: ${goal.timeWindowDays} days
 Current phase: ${goal.currentPhase}
 Day: ${dayNumber} of ${goal.timeWindowDays}
-
+${contextSection}
 ## Measurement Policy (v${policy.version})
 Signal weights:
 - goalDirectDeepWork: ${policy.signalWeights.goalDirectDeepWork}
@@ -2608,10 +3133,9 @@ Signal weights:
 ${policy.milestones.length > 0 ? `Milestones:
 ${policy.milestones.map((m) => `- ${m.text} (deadline: ${m.deadline}, completed: ${m.completed})`).join("\n")}` : "No milestones set yet."}
 
-## Today's Signals (${signals.date})
+## Today's Priority Actions (${priorityTasks.length} tasks \u2014 ONLY evaluate these)
 
-### Tasks (${signals.tasks.length})
-${signals.tasks.length > 0 ? signals.tasks.map((t) => `- [${t.completed ? "x" : " "}] ${t.title} ${t.tags.join(" ")} | effort: ${t.effort}${t.timeAnnotation ? ` | time: ${t.timeAnnotation} (${t.durationMin}min)` : ""}`).join("\n") : "No tasks recorded today."}
+${priorityTasks.length > 0 ? priorityTasks.map((t) => `- [${t.completed ? "x" : " "}] ${t.title} ${t.tags.join(" ")} | effort: ${t.effort}${t.timeAnnotation ? ` | time: ${t.timeAnnotation} (${t.durationMin}min)` : ""}`).join("\n") : "No priority actions set for today."}
 
 ### Feedback (${signals.feedback.length})
 ${signals.feedback.length > 0 ? signals.feedback.map((f) => `- [${f.type}] ${f.text} ${f.tags.join(" ")}`).join("\n") : "No feedback entries today."}
@@ -2623,9 +3147,9 @@ ${signals.reflections.length > 0 ? signals.reflections.map((r) => `- ${r.text}`)
 - Files modified: ${signals.vaultActivity.filesModified}
 - Active folders: ${signals.vaultActivity.foldersActive.join(", ") || "none"}
 
-Produce the assessment JSON now.`;
+Produce the assessment JSON now. Remember: taskCompletion is based ONLY on the ${priorityTasks.length} priority actions above.`;
   }
-  parseAssessResponse(raw, dateStr, dayNumber, signals, policyVersion) {
+  parseAssessResponse(raw, dateStr, dayNumber, signals, policyVersion, goalId) {
     let jsonStr = raw.trim();
     const jsonMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (jsonMatch) {
@@ -2634,6 +3158,7 @@ Produce the assessment JSON now.`;
     const parsed = JSON.parse(jsonStr);
     return {
       id: `assess-${dateStr}-${Date.now()}`,
+      goalId,
       date: dateStr,
       dayNumber,
       overallScore: Math.max(0, Math.min(100, parsed.overallScore || 0)),
@@ -2762,16 +3287,16 @@ var ActaTaskPlugin = class extends import_obsidian12.Plugin {
         this.settings
       );
     });
-    this.addRibbonIcon("list-checks", "Open Acta Task Board", () => {
+    this.addRibbonIcon("list-checks", "Open Northstar Board", () => {
       this.openBoard();
     });
     this.addCommand({
-      id: "open-acta-task-board",
+      id: "open-northstar-board",
       name: "Open task board",
       callback: () => this.openBoard()
     });
     this.addCommand({
-      id: "refresh-acta-task-board",
+      id: "refresh-northstar-board",
       name: "Refresh task board",
       callback: () => this.refreshBoard()
     });
@@ -2924,22 +3449,36 @@ var ActaTaskPlugin = class extends import_obsidian12.Plugin {
   }
   async loadNorthStarData() {
     const data = await this.loadData();
+    const raw = data == null ? void 0 : data.northStar;
     this.northStarData = Object.assign(
       {},
       DEFAULT_NORTHSTAR_DATA,
-      data == null ? void 0 : data.northStar
+      raw
     );
-    if (!this.northStarData.policy) {
-      this.northStarData.policy = { ...DEFAULT_NORTHSTAR_DATA.policy };
-    }
-    if (!this.northStarData.assessments) {
-      this.northStarData.assessments = [];
-    }
     if (!this.northStarData.archivedGoals) {
       this.northStarData.archivedGoals = [];
     }
-    if (!this.northStarData.tinkerMessages) {
-      this.northStarData.tinkerMessages = [];
+    if (!this.northStarData.goalContexts) {
+      this.northStarData.goalContexts = [];
+    }
+    if ((raw == null ? void 0 : raw.goal) && !raw.goalContexts) {
+      const legacyGoal = raw.goal;
+      const legacyPolicy = raw.policy || { ...DEFAULT_NORTHSTAR_DATA };
+      const legacyAssessments = raw.assessments || [];
+      for (const a of legacyAssessments) {
+        if (!a.goalId) {
+          a.goalId = legacyGoal.id;
+        }
+      }
+      this.northStarData.goalContexts = [{
+        goal: legacyGoal,
+        policy: legacyPolicy,
+        assessments: legacyAssessments,
+        tinkerMessages: []
+      }];
+      delete this.northStarData.goal;
+      delete this.northStarData.policy;
+      delete this.northStarData.assessments;
     }
   }
   async saveNorthStarData() {

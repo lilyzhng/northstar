@@ -17,7 +17,7 @@ export class NorthStarLlmClient {
 	async chat(systemPrompt: string, messages: LlmMessage[]): Promise<string> {
 		const apiKey = this.settings.anthropicApiKey;
 		if (!apiKey) {
-			throw new Error("Anthropic API key not set. Go to Settings → Acta Task → North Star to add it.");
+			throw new Error("Anthropic API key not set. Go to Settings → Northstar → North Star to add it.");
 		}
 
 		let response;
@@ -43,7 +43,7 @@ export class NorthStarLlmClient {
 		}
 
 		if (response.status === 401) {
-			throw new Error("Invalid API key. Check your key in Settings → Acta Task → North Star.");
+			throw new Error("Invalid API key. Check your key in Settings → Northstar → North Star.");
 		}
 
 		if (response.status !== 200) {
@@ -61,7 +61,7 @@ export class NorthStarLlmClient {
 	async chatWithTools(systemPrompt: string, messages: ApiMessage[], tools: ToolDefinition[]): Promise<ApiResponse> {
 		const apiKey = this.settings.anthropicApiKey;
 		if (!apiKey) {
-			throw new Error("Anthropic API key not set. Go to Settings → Acta Task → North Star to add it.");
+			throw new Error("Anthropic API key not set. Go to Settings → Northstar → North Star to add it.");
 		}
 
 		let response;
@@ -88,7 +88,7 @@ export class NorthStarLlmClient {
 		}
 
 		if (response.status === 401) {
-			throw new Error("Invalid API key. Check your key in Settings → Acta Task → North Star.");
+			throw new Error("Invalid API key. Check your key in Settings → Northstar → North Star.");
 		}
 
 		if (response.status !== 200) {
@@ -105,7 +105,7 @@ export class NorthStarLlmClient {
 	async call(systemPrompt: string, userMessage: string): Promise<string> {
 		const apiKey = this.settings.anthropicApiKey;
 		if (!apiKey) {
-			throw new Error("Anthropic API key not set. Go to Settings → Acta Task → North Star to add it.");
+			throw new Error("Anthropic API key not set. Go to Settings → Northstar → North Star to add it.");
 		}
 
 		let response;
@@ -131,7 +131,7 @@ export class NorthStarLlmClient {
 		}
 
 		if (response.status === 401) {
-			throw new Error("Invalid API key. Check your key in Settings → Acta Task → North Star.");
+			throw new Error("Invalid API key. Check your key in Settings → Northstar → North Star.");
 		}
 
 		if (response.status !== 200) {
