@@ -3956,7 +3956,12 @@ var ActaTaskPlugin = class extends import_obsidian13.Plugin {
   }
   async loadSettings() {
     const data = await this.loadData();
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, data == null ? void 0 : data.settings);
+    const settings = data == null ? void 0 : data.settings;
+    if ((settings == null ? void 0 : settings.northStarModel) && !(settings == null ? void 0 : settings.promiseLandModel)) {
+      settings.promiseLandModel = settings.northStarModel;
+      delete settings.northStarModel;
+    }
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, settings);
   }
   async saveSettings() {
     await this.saveData({
@@ -4055,8 +4060,9 @@ var ActaTaskPlugin = class extends import_obsidian13.Plugin {
     });
   }
   async loadPromiseLandData() {
+    var _a;
     const data = await this.loadData();
-    const raw = data == null ? void 0 : data.promiseLand;
+    const raw = (_a = data == null ? void 0 : data.promiseLand) != null ? _a : data == null ? void 0 : data.northStar;
     this.promiseLandData = Object.assign(
       {},
       DEFAULT_PROMISELAND_DATA,

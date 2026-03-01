@@ -245,7 +245,13 @@ export default class ActaTaskPlugin extends Plugin {
 
 	async loadSettings(): Promise<void> {
 		const data = await this.loadData();
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, data?.settings);
+		const settings = data?.settings;
+		// Migrate legacy northStarModel -> promiseLandModel
+		if (settings?.northStarModel && !settings?.promiseLandModel) {
+			settings.promiseLandModel = settings.northStarModel;
+			delete settings.northStarModel;
+		}
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, settings);
 	}
 
 	async saveSettings(): Promise<void> {
@@ -351,7 +357,8 @@ export default class ActaTaskPlugin extends Plugin {
 
 	async loadPromiseLandData(): Promise<void> {
 		const data = await this.loadData();
-		const raw = data?.promiseLand;
+		// Migrate legacy northStar -> promiseLand
+		const raw = data?.promiseLand ?? data?.northStar;
 		this.promiseLandData = Object.assign(
 			{},
 			DEFAULT_PROMISELAND_DATA,
