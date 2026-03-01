@@ -1,13 +1,13 @@
 import { requestUrl } from "obsidian";
 import { ActaTaskSettings } from "./types";
-import { ApiMessage, ApiResponse, ToolDefinition } from "./northStarTypes";
+import { ApiMessage, ApiResponse, ToolDefinition } from "./promiseLandTypes";
 
 export interface LlmMessage {
 	role: "user" | "assistant";
 	content: string;
 }
 
-export class NorthStarLlmClient {
+export class PromiseLandLlmClient {
 	constructor(private settings: ActaTaskSettings) {}
 
 	updateSettings(settings: ActaTaskSettings): void {
@@ -17,7 +17,7 @@ export class NorthStarLlmClient {
 	async chat(systemPrompt: string, messages: LlmMessage[]): Promise<string> {
 		const apiKey = this.settings.anthropicApiKey;
 		if (!apiKey) {
-			throw new Error("Anthropic API key not set. Go to Settings → Northstar → North Star to add it.");
+			throw new Error("Anthropic API key not set. Go to Settings → PromiseLand to add it.");
 		}
 
 		let response;
@@ -31,7 +31,7 @@ export class NorthStarLlmClient {
 					"anthropic-version": "2023-06-01",
 				},
 				body: JSON.stringify({
-					model: this.settings.northStarModel,
+					model: this.settings.promiseLandModel,
 					max_tokens: 4096,
 					system: systemPrompt,
 					messages: messages.map(m => ({ role: m.role, content: m.content })),
@@ -43,7 +43,7 @@ export class NorthStarLlmClient {
 		}
 
 		if (response.status === 401) {
-			throw new Error("Invalid API key. Check your key in Settings → Northstar → North Star.");
+			throw new Error("Invalid API key. Check your key in Settings → PromiseLand.");
 		}
 
 		if (response.status !== 200) {
@@ -61,7 +61,7 @@ export class NorthStarLlmClient {
 	async chatWithTools(systemPrompt: string, messages: ApiMessage[], tools: ToolDefinition[]): Promise<ApiResponse> {
 		const apiKey = this.settings.anthropicApiKey;
 		if (!apiKey) {
-			throw new Error("Anthropic API key not set. Go to Settings → Northstar → North Star to add it.");
+			throw new Error("Anthropic API key not set. Go to Settings → PromiseLand to add it.");
 		}
 
 		let response;
@@ -75,7 +75,7 @@ export class NorthStarLlmClient {
 					"anthropic-version": "2023-06-01",
 				},
 				body: JSON.stringify({
-					model: this.settings.northStarModel,
+					model: this.settings.promiseLandModel,
 					max_tokens: 4096,
 					system: systemPrompt,
 					messages: messages.map(m => ({ role: m.role, content: m.content })),
@@ -88,7 +88,7 @@ export class NorthStarLlmClient {
 		}
 
 		if (response.status === 401) {
-			throw new Error("Invalid API key. Check your key in Settings → Northstar → North Star.");
+			throw new Error("Invalid API key. Check your key in Settings → PromiseLand.");
 		}
 
 		if (response.status !== 200) {
@@ -105,7 +105,7 @@ export class NorthStarLlmClient {
 	async call(systemPrompt: string, userMessage: string): Promise<string> {
 		const apiKey = this.settings.anthropicApiKey;
 		if (!apiKey) {
-			throw new Error("Anthropic API key not set. Go to Settings → Northstar → North Star to add it.");
+			throw new Error("Anthropic API key not set. Go to Settings → PromiseLand to add it.");
 		}
 
 		let response;
@@ -119,7 +119,7 @@ export class NorthStarLlmClient {
 					"anthropic-version": "2023-06-01",
 				},
 				body: JSON.stringify({
-					model: this.settings.northStarModel,
+					model: this.settings.promiseLandModel,
 					max_tokens: 4096,
 					system: systemPrompt,
 					messages: [{ role: "user", content: userMessage }],
@@ -131,7 +131,7 @@ export class NorthStarLlmClient {
 		}
 
 		if (response.status === 401) {
-			throw new Error("Invalid API key. Check your key in Settings → Northstar → North Star.");
+			throw new Error("Invalid API key. Check your key in Settings → PromiseLand.");
 		}
 
 		if (response.status !== 200) {

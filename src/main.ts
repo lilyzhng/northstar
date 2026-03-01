@@ -1,4 +1,5 @@
-import { Plugin, WorkspaceLeaf } from "obsidian";
+import { Plugin, WorkspaceLeaf, TFile, debounce } from "obsidian";
+import { execSync } from "child_process";
 import {
 	ActaTaskSettings,
 	ActaTaskData,
@@ -11,12 +12,12 @@ import {
 	ACTA_TASK_VIEW_TYPE,
 	ACTA_FEEDBACK_VIEW_TYPE,
 	ACTA_NEGATIVE_FEEDBACK_VIEW_TYPE,
-	ACTA_NORTHSTAR_VIEW_TYPE,
+	ACTA_PROMISELAND_VIEW_TYPE,
 } from "./types";
 import { TaskBoardView } from "./taskBoardView";
 import { FeedbackBoardView } from "./feedbackBoardView";
 import { NegativeFeedbackBoardView } from "./negativeFeedbackBoardView";
-import { NorthStarBoardView } from "./northStarBoardView";
+import { PromiseLandBoardView } from "./promiseLandBoardView";
 import { ActaTaskSettingTab } from "./settings";
 import { TaskManager } from "./taskManager";
 import { TaskScanner } from "./taskScanner";
@@ -25,18 +26,18 @@ import { FeedbackManager } from "./feedbackManager";
 import { FeedbackScanner } from "./feedbackScanner";
 import { NegativeFeedbackManager } from "./negativeFeedbackManager";
 import { NegativeFeedbackScanner } from "./negativeFeedbackScanner";
-import { ActaNorthStarData, DEFAULT_NORTHSTAR_DATA } from "./northStarTypes";
-import { NorthStarManager } from "./northStarManager";
-import { NorthStarLlmClient } from "./northStarLlmClient";
-import { NorthStarObserver } from "./northStarObserver";
-import { NorthStarAgent } from "./northStarAgent";
+import { ActaPromiseLandData, DEFAULT_PROMISELAND_DATA } from "./promiseLandTypes";
+import { PromiseLandManager } from "./promiseLandManager";
+import { PromiseLandLlmClient } from "./promiseLandLlmClient";
+import { PromiseLandObserver } from "./promiseLandObserver";
+import { PromiseLandAgent } from "./promiseLandAgent";
 
 export default class ActaTaskPlugin extends Plugin {
 	settings: ActaTaskSettings = DEFAULT_SETTINGS;
 	data: ActaTaskData = DEFAULT_DATA;
 	feedbackData: ActaFeedbackData = DEFAULT_FEEDBACK_DATA;
 	negativeFeedbackData: ActaNegativeFeedbackData = DEFAULT_NEGATIVE_FEEDBACK_DATA;
-	northStarData: ActaNorthStarData = { ...DEFAULT_NORTHSTAR_DATA };
+	promiseLandData: ActaPromiseLandData = { ...DEFAULT_PROMISELAND_DATA };
 	taskManager: TaskManager | null = null;
 	scanner: TaskScanner | null = null;
 	toggler: TaskToggler | null = null;
@@ -44,17 +45,18 @@ export default class ActaTaskPlugin extends Plugin {
 	feedbackScanner: FeedbackScanner | null = null;
 	negativeFeedbackManager: NegativeFeedbackManager | null = null;
 	negativeFeedbackScanner: NegativeFeedbackScanner | null = null;
-	northStarManager: NorthStarManager | null = null;
-	northStarLlmClient: NorthStarLlmClient | null = null;
-	northStarObserver: NorthStarObserver | null = null;
-	northStarAgent: NorthStarAgent | null = null;
+	promiseLandManager: PromiseLandManager | null = null;
+	promiseLandLlmClient: PromiseLandLlmClient | null = null;
+	promiseLandObserver: PromiseLandObserver | null = null;
+	promiseLandAgent: PromiseLandAgent | null = null;
+	private autoCommitDebounced: ReturnType<typeof debounce> | null = null;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
 		await this.loadTaskData();
 		await this.loadFeedbackData();
 		await this.loadNegativeFeedbackData();
-		await this.loadNorthStarData();
+		await this.loadPromiseLandData();
 
 		// Initialize task managers
 		this.taskManager = new TaskManager(
@@ -92,25 +94,25 @@ export default class ActaTaskPlugin extends Plugin {
 			this.settings
 		);
 
-		// Initialize North Star
-		this.northStarManager = new NorthStarManager(
+		// Initialize Promise Land
+		this.promiseLandManager = new PromiseLandManager(
 			this.app,
 			this.settings,
-			this.northStarData,
-			() => this.saveNorthStarData()
+			this.promiseLandData,
+			() => this.savePromiseLandData()
 		);
-		this.northStarLlmClient = new NorthStarLlmClient(this.settings);
-		this.northStarObserver = new NorthStarObserver(
+		this.promiseLandLlmClient = new PromiseLandLlmClient(this.settings);
+		this.promiseLandObserver = new PromiseLandObserver(
 			this.app,
 			this.settings,
 			this.data,
 			this.feedbackData,
 			this.negativeFeedbackData
 		);
-		this.northStarAgent = new NorthStarAgent(
-			this.northStarManager,
-			this.northStarObserver,
-			this.northStarLlmClient
+		this.promiseLandAgent = new PromiseLandAgent(
+			this.promiseLandManager,
+			this.promiseLandObserver,
+			this.promiseLandLlmClient
 		);
 
 		// Register task board view
@@ -144,30 +146,30 @@ export default class ActaTaskPlugin extends Plugin {
 			);
 		});
 
-		// Register North Star board view
-		this.registerView(ACTA_NORTHSTAR_VIEW_TYPE, (leaf) => {
-			return new NorthStarBoardView(
+		// Register Promise Land board view
+		this.registerView(ACTA_PROMISELAND_VIEW_TYPE, (leaf) => {
+			return new PromiseLandBoardView(
 				leaf,
-				this.northStarManager!,
-				this.northStarAgent!,
-				this.northStarLlmClient!,
+				this.promiseLandManager!,
+				this.promiseLandAgent!,
+				this.promiseLandLlmClient!,
 				this.settings
 			);
 		});
 
 		// Task board ribbon and commands
-		this.addRibbonIcon("list-checks", "Open Northstar Board", () => {
+		this.addRibbonIcon("list-checks", "Open PromiseLand Board", () => {
 			this.openBoard();
 		});
 
 		this.addCommand({
-			id: "open-northstar-board",
+			id: "open-promiseland-board",
 			name: "Open task board",
 			callback: () => this.openBoard(),
 		});
 
 		this.addCommand({
-			id: "refresh-northstar-board",
+			id: "refresh-promiseland-board",
 			name: "Refresh task board",
 			callback: () => this.refreshBoard(),
 		});
@@ -206,31 +208,39 @@ export default class ActaTaskPlugin extends Plugin {
 			callback: () => this.refreshNegativeFeedbackBoard(),
 		});
 
-		// North Star board ribbon and commands
-		this.addRibbonIcon("star", "Open North Star board", () => {
-			this.openNorthStarBoard();
+		// Promise Land board ribbon and commands
+		this.addRibbonIcon("star", "Open Promise Land board", () => {
+			this.openPromiseLandBoard();
 		});
 
 		this.addCommand({
-			id: "open-acta-northstar-board",
-			name: "Open North Star board",
-			callback: () => this.openNorthStarBoard(),
+			id: "open-acta-promiseland-board",
+			name: "Open Promise Land board",
+			callback: () => this.openPromiseLandBoard(),
 		});
 
 		this.addCommand({
-			id: "refresh-acta-northstar-board",
-			name: "Refresh North Star board",
-			callback: () => this.refreshNorthStarBoard(),
+			id: "refresh-acta-promiseland-board",
+			name: "Refresh Promise Land board",
+			callback: () => this.refreshPromiseLandBoard(),
 		});
 
 		this.addSettingTab(new ActaTaskSettingTab(this.app, this));
+
+		// Auto-commit on file changes (debounced 60s)
+		this.setupAutoCommit();
+
+		// Auto-stamp new files with date property
+		this.setupDateStamping();
 	}
 
 	async onunload(): Promise<void> {
 		this.app.workspace.detachLeavesOfType(ACTA_TASK_VIEW_TYPE);
 		this.app.workspace.detachLeavesOfType(ACTA_FEEDBACK_VIEW_TYPE);
 		this.app.workspace.detachLeavesOfType(ACTA_NEGATIVE_FEEDBACK_VIEW_TYPE);
-		this.app.workspace.detachLeavesOfType(ACTA_NORTHSTAR_VIEW_TYPE);
+		this.app.workspace.detachLeavesOfType(ACTA_PROMISELAND_VIEW_TYPE);
+		// Final auto-commit on plugin unload
+		this.runAutoCommitAndPush();
 	}
 
 	async loadSettings(): Promise<void> {
@@ -244,7 +254,7 @@ export default class ActaTaskPlugin extends Plugin {
 			tasks: this.data,
 			feedback: this.feedbackData,
 			negativeFeedback: this.negativeFeedbackData,
-			northStar: this.northStarData,
+			promiseLand: this.promiseLandData,
 		});
 		// Propagate settings to managers and views
 		if (this.taskManager) {
@@ -265,17 +275,17 @@ export default class ActaTaskPlugin extends Plugin {
 		if (this.negativeFeedbackScanner) {
 			this.negativeFeedbackScanner.updateSettings(this.settings);
 		}
-		if (this.northStarManager) {
-			this.northStarManager.updateSettings(this.settings);
+		if (this.promiseLandManager) {
+			this.promiseLandManager.updateSettings(this.settings);
 		}
-		if (this.northStarLlmClient) {
-			this.northStarLlmClient.updateSettings(this.settings);
+		if (this.promiseLandLlmClient) {
+			this.promiseLandLlmClient.updateSettings(this.settings);
 		}
-		if (this.northStarObserver) {
-			this.northStarObserver.updateSettings(this.settings);
+		if (this.promiseLandObserver) {
+			this.promiseLandObserver.updateSettings(this.settings);
 		}
-		const northStarView = this.getActiveNorthStarView();
-		if (northStarView) northStarView.updateSettings(this.settings);
+		const promiseLandView = this.getActivePromiseLandView();
+		if (promiseLandView) promiseLandView.updateSettings(this.settings);
 		const taskView = this.getActiveTaskView();
 		if (taskView) taskView.updateSettings(this.settings);
 		const feedbackView = this.getActiveFeedbackView();
@@ -297,7 +307,7 @@ export default class ActaTaskPlugin extends Plugin {
 			tasks: this.data,
 			feedback: this.feedbackData,
 			negativeFeedback: this.negativeFeedbackData,
-			northStar: this.northStarData,
+			promiseLand: this.promiseLandData,
 		});
 	}
 
@@ -316,7 +326,7 @@ export default class ActaTaskPlugin extends Plugin {
 			tasks: this.data,
 			feedback: this.feedbackData,
 			negativeFeedback: this.negativeFeedbackData,
-			northStar: this.northStarData,
+			promiseLand: this.promiseLandData,
 		});
 	}
 
@@ -335,32 +345,32 @@ export default class ActaTaskPlugin extends Plugin {
 			tasks: this.data,
 			feedback: this.feedbackData,
 			negativeFeedback: this.negativeFeedbackData,
-			northStar: this.northStarData,
+			promiseLand: this.promiseLandData,
 		});
 	}
 
-	async loadNorthStarData(): Promise<void> {
+	async loadPromiseLandData(): Promise<void> {
 		const data = await this.loadData();
-		const raw = data?.northStar;
-		this.northStarData = Object.assign(
+		const raw = data?.promiseLand;
+		this.promiseLandData = Object.assign(
 			{},
-			DEFAULT_NORTHSTAR_DATA,
+			DEFAULT_PROMISELAND_DATA,
 			raw
 		);
 		// Ensure nested defaults
-		if (!this.northStarData.archivedGoals) {
-			this.northStarData.archivedGoals = [];
+		if (!this.promiseLandData.archivedGoals) {
+			this.promiseLandData.archivedGoals = [];
 		}
 		// tinkerMessages is now per-goal (legacy shared field handled by manager migration)
-		if (!this.northStarData.goalContexts) {
-			this.northStarData.goalContexts = [];
+		if (!this.promiseLandData.goalContexts) {
+			this.promiseLandData.goalContexts = [];
 		}
 
 		// Migrate legacy single-goal data to goalContexts
 		if (raw?.goal && !raw.goalContexts) {
 			const legacyGoal = raw.goal;
-			const legacyPolicy = raw.policy || { ...DEFAULT_NORTHSTAR_DATA };
-			const legacyAssessments: import("./northStarTypes").Assessment[] = raw.assessments || [];
+			const legacyPolicy = raw.policy || { ...DEFAULT_PROMISELAND_DATA };
+			const legacyAssessments: import("./promiseLandTypes").Assessment[] = raw.assessments || [];
 
 			// Backfill goalId on legacy assessments
 			for (const a of legacyAssessments) {
@@ -369,7 +379,7 @@ export default class ActaTaskPlugin extends Plugin {
 				}
 			}
 
-			this.northStarData.goalContexts = [{
+			this.promiseLandData.goalContexts = [{
 				goal: legacyGoal,
 				policy: legacyPolicy,
 				assessments: legacyAssessments,
@@ -377,19 +387,19 @@ export default class ActaTaskPlugin extends Plugin {
 			}];
 
 			// Clean up legacy fields
-			delete this.northStarData.goal;
-			delete this.northStarData.policy;
-			delete this.northStarData.assessments;
+			delete this.promiseLandData.goal;
+			delete this.promiseLandData.policy;
+			delete this.promiseLandData.assessments;
 		}
 	}
 
-	async saveNorthStarData(): Promise<void> {
+	async savePromiseLandData(): Promise<void> {
 		await this.saveData({
 			settings: this.settings,
 			tasks: this.data,
 			feedback: this.feedbackData,
 			negativeFeedback: this.negativeFeedbackData,
-			northStar: this.northStarData,
+			promiseLand: this.promiseLandData,
 		});
 	}
 
@@ -494,24 +504,24 @@ export default class ActaTaskPlugin extends Plugin {
 		}
 	}
 
-	private getActiveNorthStarView(): NorthStarBoardView | null {
+	private getActivePromiseLandView(): PromiseLandBoardView | null {
 		const leaves = this.app.workspace.getLeavesOfType(
-			ACTA_NORTHSTAR_VIEW_TYPE
+			ACTA_PROMISELAND_VIEW_TYPE
 		);
 		if (leaves.length > 0) {
-			return leaves[0].view as NorthStarBoardView;
+			return leaves[0].view as PromiseLandBoardView;
 		}
 		return null;
 	}
 
-	private refreshNorthStarBoard(): void {
-		const view = this.getActiveNorthStarView();
+	private refreshPromiseLandBoard(): void {
+		const view = this.getActivePromiseLandView();
 		if (view) view.refresh();
 	}
 
-	private async openNorthStarBoard(): Promise<void> {
+	private async openPromiseLandBoard(): Promise<void> {
 		const existing = this.app.workspace.getLeavesOfType(
-			ACTA_NORTHSTAR_VIEW_TYPE
+			ACTA_PROMISELAND_VIEW_TYPE
 		);
 		if (existing.length > 0) {
 			this.app.workspace.revealLeaf(existing[0]);
@@ -521,10 +531,122 @@ export default class ActaTaskPlugin extends Plugin {
 		const leaf = this.app.workspace.getRightLeaf(false);
 		if (leaf) {
 			await leaf.setViewState({
-				type: ACTA_NORTHSTAR_VIEW_TYPE,
+				type: ACTA_PROMISELAND_VIEW_TYPE,
 				active: true,
 			});
 			this.app.workspace.revealLeaf(leaf);
+		}
+	}
+
+	// ── Auto-commit on file changes ──
+
+	private getVaultRoot(): string {
+		return (this.app.vault.adapter as any).basePath;
+	}
+
+	private runGit(cmd: string): string {
+		try {
+			return execSync(cmd, {
+				cwd: this.getVaultRoot(),
+				encoding: "utf-8",
+				timeout: 15000,
+			}).trim();
+		} catch {
+			return "";
+		}
+	}
+
+	private setupAutoCommit(): void {
+		// Debounce: wait 60 seconds after the last file change before committing
+		this.autoCommitDebounced = debounce(
+			() => this.runAutoCommitAndPush(),
+			60 * 1000,
+			true // reset timer on each call
+		);
+
+		// Listen for file modifications, creations, and deletions
+		this.registerEvent(
+			this.app.vault.on("modify", () => this.autoCommitDebounced?.())
+		);
+		this.registerEvent(
+			this.app.vault.on("create", () => this.autoCommitDebounced?.())
+		);
+		this.registerEvent(
+			this.app.vault.on("delete", () => this.autoCommitDebounced?.())
+		);
+		this.registerEvent(
+			this.app.vault.on("rename", () => this.autoCommitDebounced?.())
+		);
+	}
+
+	private runAutoCommitAndPush(): void {
+		const status = this.runGit("git status --porcelain");
+		if (!status) return; // Nothing to commit
+
+		const now = new Date();
+		const timestamp = now.toISOString().replace(/\.\d{3}Z$/, "");
+		this.runGit("git add -A");
+		this.runGit(`git commit -m "vault: auto-save ${timestamp}"`);
+		this.runGit("git push");
+	}
+
+	// ── Auto date-stamp new files ──
+
+	private setupDateStamping(): void {
+		this.registerEvent(
+			this.app.vault.on("create", (file) => {
+				if (!(file instanceof TFile)) return;
+				if (!file.path.endsWith(".md")) return;
+				// Skip system folders
+				if (file.path.startsWith(".obsidian/")) return;
+				if (file.path.startsWith("PromiseLand/check-ins/")) return;
+
+				// Small delay to let Obsidian/templates finish writing initial content
+				setTimeout(() => this.stampDateProperty(file), 500);
+			})
+		);
+	}
+
+	private async stampDateProperty(file: TFile): Promise<void> {
+		try {
+			// Only stamp truly new files — skip moved/existing files
+			// A truly new file was created within the last 10 seconds
+			const now = Date.now();
+			if (now - file.stat.ctime > 10000) return; // File is older than 10s, likely moved
+
+			const content = await this.app.vault.read(file);
+
+			// Don't stamp if file already has frontmatter with a date
+			if (content.startsWith("---")) {
+				const endIdx = content.indexOf("---", 3);
+				if (endIdx > 0) {
+					const frontmatter = content.substring(3, endIdx);
+					if (/^date:/m.test(frontmatter)) return;
+				}
+			}
+
+			const nowDate = new Date();
+			const dateStr = `${nowDate.getFullYear()}-${String(nowDate.getMonth() + 1).padStart(2, "0")}-${String(nowDate.getDate()).padStart(2, "0")}`;
+			const timeStr = `${String(nowDate.getHours()).padStart(2, "0")}:${String(nowDate.getMinutes()).padStart(2, "0")}`;
+
+			let newContent: string;
+			if (content.startsWith("---")) {
+				// Existing frontmatter — inject date + time after opening ---
+				const endIdx = content.indexOf("---", 3);
+				if (endIdx > 0) {
+					const frontmatter = content.substring(3, endIdx);
+					newContent = `---\ndate: ${dateStr}\ntime: ${timeStr}\n${frontmatter.trim() ? frontmatter.trimEnd() + "\n" : ""}---${content.substring(endIdx + 3)}`;
+				} else {
+					newContent = `---\ndate: ${dateStr}\ntime: ${timeStr}\n---\n${content}`;
+				}
+			} else {
+				// No frontmatter — add it
+				newContent = `---\ndate: ${dateStr}\ntime: ${timeStr}\n---\n${content}`;
+			}
+
+			await this.app.vault.modify(file, newContent);
+		} catch {
+			// Silently fail — don't break the user's workflow
 		}
 	}
 }

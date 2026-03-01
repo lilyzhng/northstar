@@ -1,14 +1,14 @@
-# North Star — Product Design
+# Promise Land — Product Design
 
 ## What Is It
 
-North Star is the 4th board in Northstar. The other three boards are passive records — you write tasks, log feedback. North Star is different: it's an **active agent** that watches what you do, tells you whether you're converging on your goal, and evolves how it measures you over time.
+Promise Land is the 4th board in PromiseLand. The other three boards are passive records — you write tasks, log feedback. Promise Land is different: it's an **active agent** that watches what you do, tells you whether you're converging on your goal, and evolves how it measures you over time.
 
-You set a goal. You lock it in. Then you just work — write notes, complete tasks, log feedback like you normally do. North Star reads all of that and tells you: "Here's how aligned your day was. Here's where you're drifting. Here's what to think about tomorrow."
+You set a goal. You lock it in. Then you just work — write notes, complete tasks, log feedback like you normally do. Promise Land reads all of that and tells you: "Here's how aligned your day was. Here's where you're drifting. Here's what to think about tomorrow."
 
 ## Design Principles
 
-1. **The goal is immutable; everything else evolves.** You set the north star once and lock it. The system's measurement strategy, the questions it asks you, and how it breaks down the goal all adapt continuously — but the goal itself never changes.
+1. **The goal is immutable; everything else evolves.** You set the promise land once and lock it. The system's measurement strategy, the questions it asks you, and how it breaks down the goal all adapt continuously — but the goal itself never changes.
 
 2. **System-derived alignment, not self-reported.** You don't score yourself "4/5." You work and reflect naturally. The system reads your signals and derives alignment. This prevents self-assessment drift.
 
@@ -18,7 +18,7 @@ You set a goal. You lock it in. Then you just work — write notes, complete tas
 
 ## How It Works — The Agent Loop
 
-North Star runs a cycle (daily, or when you trigger it):
+Promise Land runs a cycle (daily, or when you trigger it):
 
 ```
 OBSERVE → ASSESS → REFLECT → ADAPT
@@ -37,7 +37,7 @@ The system collects raw signals from your vault. No judgment yet, just gathering
 | Task board | Tasks created, completed, abandoned, overdue. Parses time annotations (e.g., `@9-10AM`) to extract duration and classifies effort level (`deep_work` vs `quick_action`). |
 | Positive feedback board | What you said went well |
 | Negative feedback board | What you said needs improvement |
-| Daily notes / reflections | Free-form writing tagged `#northstar` or in your daily note |
+| Daily notes / reflections | Free-form writing tagged `#promiseland` or in your daily note |
 | Vault activity | Which files and folders you worked in |
 
 **Time annotation convention:** When completing a task, you can add `@[start]-[end]` to log time spent (e.g., `@9-10AM`, `@2-5PM`). This is just typed text — no plugin needed. The system parses these to calculate duration and classify effort:
@@ -81,7 +81,7 @@ This is the self-evolvement. The system proposes changes to its own policy. The 
 > Day 15 → "You've been focused on X for a week. Is X still the right bet?"
 > Day 30 → "What's blocking you from shipping? Be specific."
 
-**c) Goal decomposition (milestones)** — The system breaks your north star into sub-milestones and adapts them as it learns. Milestones can be completed, dropped, or evolved into something better. Each change is explained.
+**c) Goal decomposition (milestones)** — The system breaks your promise land into sub-milestones and adapts them as it learns. Milestones can be completed, dropped, or evolved into something better. Each change is explained.
 
 > Example: "Research competitor landscape" → completed → evolved into "Define differentiators based on research findings"
 
@@ -265,7 +265,7 @@ The system can transition between phases, add new ones, or redefine what they me
 
 ## The Key Invariant
 
-**The north star goal is never modified by the agent.** It's the fixed point everything orbits. The system evolves *how* it measures alignment, *what* it asks you, and *how* it breaks down the goal — but it cannot change what the goal *is*.
+**The promise land goal is never modified by the agent.** It's the fixed point everything orbits. The system evolves *how* it measures alignment, *what* it asks you, and *how* it breaks down the goal — but it cannot change what the goal *is*.
 
 If the goal itself turns out to be wrong, you abandon it and create a new one. You don't quietly edit it.
 
@@ -278,10 +278,10 @@ If the goal itself turns out to be wrong, you abandon it and create a new one. Y
 ## What the User Experience Looks Like
 
 ### Setting a goal
-You open the North Star board → click "Set Goal" → type your goal and time window (e.g., 45 days) → the system locks it in, seeds initial phases and milestones, and starts watching.
+You open the Promise Land board → click "Set Goal" → type your goal and time window (e.g., 45 days) → the system locks it in, seeds initial phases and milestones, and starts watching.
 
 ### Daily workflow
-You don't change your workflow. You write tasks, log feedback, write daily notes. If you want to write a specific north star reflection, you tag it `#northstar`. The system reads everything on its next cycle.
+You don't change your workflow. You write tasks, log feedback, write daily notes. If you want to write a specific promise land reflection, you tag it `#promiseland`. The system reads everything on its next cycle.
 
 ### Opening the board
 You see your goal prominently at the top (it never changes). Below it: today's alignment score with a breakdown of why. Current phase. Milestone progress. Any warnings. Today's evolved prompts for reflection. At the bottom: the evolution log showing how the system has adapted itself.
@@ -294,13 +294,13 @@ When the window closes, the system generates a retrospective: how alignment evol
 
 ## Tinker
 
-The NorthStar board includes a built-in chat panel. This isn't a general-purpose AI chat — it's a Tinker that already knows your goal, your current phase, your trajectory, and your recent drift patterns.
+The PromiseLand board includes a built-in chat panel. This isn't a general-purpose AI chat — it's a Tinker that already knows your goal, your current phase, your trajectory, and your recent drift patterns.
 
 ### Why not use an external chat plugin?
 
-General-purpose chat tools (like Claudian) are executors — they default to writing notes, editing files, taking action. NorthStar needs a Tinker that pushes back, asks hard questions, and helps you reason about your goal. Different purpose, different persona, different UX.
+General-purpose chat tools (like Claudian) are executors — they default to writing notes, editing files, taking action. PromiseLand needs a Tinker that pushes back, asks hard questions, and helps you reason about your goal. Different purpose, different persona, different UX.
 
-More importantly: context. A NorthStar conversation starts pre-loaded with your locked goal, current phase, latest assessment, milestone status, and recent drift/momentum signals. You don't explain where you are — the Tinker already knows. An external chat would need you to re-establish context every time, or would respond without it.
+More importantly: context. A PromiseLand conversation starts pre-loaded with your locked goal, current phase, latest assessment, milestone status, and recent drift/momentum signals. You don't explain where you are — the Tinker already knows. An external chat would need you to re-establish context every time, or would respond without it.
 
 ### What the Tinker does
 
@@ -313,14 +313,14 @@ It starts as a pure Tinker and grows into an executor as the product matures.
 - Pressure-test decisions — "If you drop milestone X, what's your path to the goal without it? Walk me through it."
 - Help you unstick — "Your alignment has been flat for 5 days. Let's look at what changed. Your negative feedback from Thursday mentioned Y — is that still unresolved?"
 
-**Phase 2: Think + execute within NorthStar's domain.** Once the Tinker dynamic is validated, the chat gains the ability to act on conclusions you reach together — but only within NorthStar's own scope:
+**Phase 2: Think + execute within PromiseLand's domain.** Once the Tinker dynamic is validated, the chat gains the ability to act on conclusions you reach together — but only within PromiseLand's own scope:
 
 - Update milestones — "OK, let's drop milestone X and replace it with Y" → the agent does it
 - Add tasks to the task board — "I need to do A, B, C this week to get back on track" → tasks created
 - Adjust signal weights or phase — "You're right, I'm past exploration" → phase transition applied
 - Trigger a new assessment cycle — "Let's re-evaluate after this conversation"
 
-The boundary: The Tinker executes within the Northstar system (milestones, tasks, policy, feedback). It doesn't become a general-purpose vault editor or file manager — that's Claudian's territory. The Tinker acts on *decisions about the goal*, not on arbitrary vault operations.
+The boundary: The Tinker executes within the PromiseLand system (milestones, tasks, policy, feedback). It doesn't become a general-purpose vault editor or file manager — that's Claudian's territory. The Tinker acts on *decisions about the goal*, not on arbitrary vault operations.
 
 ### Conversations as signal
 
@@ -332,7 +332,7 @@ This closes the loop: the board surfaces insights → you discuss them in chat �
 
 ### What it looks like
 
-The chat panel lives on the NorthStar board, alongside the dashboard. You see your alignment score, milestones, and drift warnings on one side. The chat is right there — you can react to what you see, ask "why did my alignment drop?" and get an answer grounded in your actual signals, not a generic response.
+The chat panel lives on the PromiseLand board, alongside the dashboard. You see your alignment score, milestones, and drift warnings on one side. The chat is right there — you can react to what you see, ask "why did my alignment drop?" and get an answer grounded in your actual signals, not a generic response.
 
 The conversation is persistent within a goal window. You can scroll back through past conversations and see how your thinking evolved alongside the system's assessments.
 
@@ -341,14 +341,14 @@ The conversation is persistent within a goal window. You can scroll back through
 - No general vault file writing or editing — that's Claudian
 - No vault commands, bash, or search
 - No general Q&A unrelated to the goal
-- No action outside the Northstar system boundary
+- No action outside the PromiseLand system boundary
 
 ## Open Questions
 
 1. ~~**LLM cost**: Each cycle involves LLM calls. Should we batch into one call or separate calls for assess/reflect/adapt?~~ **Resolved** — separate calls. OBSERVE is extraction (cheap/rule-based). ASSESS and REFLECT are separate calls because they require different cognitive frames and REFLECT only activates after 3+ days of history. ADAPT is isolated as a decision step. See *Call Architecture* above.
 2. ~~**Offline fallback**: What if the LLM is unreachable? Skip and retry, or fall back to a simpler mode?~~ **Resolved** —  
           +do nothing. Skip the cycle and retry next time the LLM is available. No degraded mode.
-3. ~~**Multiple goals**: One north star at a time (enforced focus), or parallel goals?~~ **Resolved** — one goal at a time.  
+3. ~~**Multiple goals**: One promise land at a time (enforced focus), or parallel goals?~~ **Resolved** — one goal at a time.  
           +Enforced focus.    
 4. **Cross-goal learning**: When a goal is archived, should the system carry forward what it learned about your work patterns to seed the next goal's policy?
 5. **Privacy**: The system reads your vault. Should there be an include/exclude list for which folders are scanned?

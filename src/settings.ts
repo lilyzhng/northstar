@@ -13,7 +13,7 @@ export class ActaTaskSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		containerEl.createEl("h2", { text: "Northstar Settings" });
+		containerEl.createEl("h2", { text: "PromiseLand Settings" });
 
 		containerEl.createEl("p", {
 			text: "Tasks with inline hashtags (e.g. - [ ] #people do something) are automatically tracked on the board.",
@@ -113,12 +113,12 @@ export class ActaTaskSettingTab extends PluginSettingTab {
 					})
 			);
 
-		// North Star settings
-		containerEl.createEl("h2", { text: "North Star" });
+		// Promise Land settings
+		containerEl.createEl("h2", { text: "Promise Land" });
 
 		new Setting(containerEl)
 			.setName("Anthropic API key")
-			.setDesc("Required for North Star alignment assessments")
+			.setDesc("Required for Promise Land alignment assessments")
 			.addText((text) =>
 				text
 					.setPlaceholder("sk-ant-...")
@@ -138,9 +138,9 @@ export class ActaTaskSettingTab extends PluginSettingTab {
 					.addOption("claude-sonnet-4-20250514", "Claude Sonnet 4")
 					.addOption("claude-haiku-4-5-20251001", "Claude Haiku 4.5")
 					.addOption("claude-opus-4-6", "Claude Opus 4.6")
-					.setValue(this.plugin.settings.northStarModel)
+					.setValue(this.plugin.settings.promiseLandModel)
 					.onChange(async (value) => {
-						this.plugin.settings.northStarModel = value;
+						this.plugin.settings.promiseLandModel = value;
 						await this.plugin.saveSettings();
 					})
 			);

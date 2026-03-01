@@ -1,23 +1,23 @@
 import { App } from "obsidian";
 import { ActaTaskSettings } from "./types";
 import {
-	ActaNorthStarData,
-	NorthStarGoal,
-	NorthStarPolicy,
+	ActaPromiseLandData,
+	PromiseLandGoal,
+	PromiseLandPolicy,
 	GoalContext,
 	Assessment,
 	TinkerMessage,
 	DEFAULT_SIGNAL_WEIGHTS,
 	DEFAULT_POLICY,
-} from "./northStarTypes";
+} from "./promiseLandTypes";
 
 const MAX_GOALS = 2;
 
-export class NorthStarManager {
+export class PromiseLandManager {
 	constructor(
 		private app: App,
 		private settings: ActaTaskSettings,
-		private data: ActaNorthStarData,
+		private data: ActaPromiseLandData,
 		private saveData: () => Promise<void>
 	) {
 		this.migrateTinkerMessages();
@@ -27,7 +27,7 @@ export class NorthStarManager {
 		this.settings = settings;
 	}
 
-	updateData(data: ActaNorthStarData): void {
+	updateData(data: ActaPromiseLandData): void {
 		this.data = data;
 		this.migrateTinkerMessages();
 	}
@@ -62,7 +62,7 @@ export class NorthStarManager {
 
 	// ── Goal access ──
 
-	getGoals(): NorthStarGoal[] {
+	getGoals(): PromiseLandGoal[] {
 		return this.data.goalContexts.map(gc => gc.goal);
 	}
 
@@ -74,7 +74,7 @@ export class NorthStarManager {
 		return this.data.goalContexts;
 	}
 
-	getPolicy(goalId: string): NorthStarPolicy {
+	getPolicy(goalId: string): PromiseLandPolicy {
 		const ctx = this.getGoalContext(goalId);
 		if (!ctx) return { ...DEFAULT_POLICY, signalWeights: { ...DEFAULT_SIGNAL_WEIGHTS }, milestones: [] };
 		return ctx.policy;
@@ -96,14 +96,14 @@ export class NorthStarManager {
 		return assessments[assessments.length - 1];
 	}
 
-	getDayNumber(goalId: string): number {
+	getDayNumber(goalId: string, forDate?: string): number {
 		const ctx = this.getGoalContext(goalId);
 		if (!ctx) return 0;
 		const lockedDate = new Date(ctx.goal.lockedAt);
 		lockedDate.setHours(0, 0, 0, 0);
-		const now = new Date();
-		now.setHours(0, 0, 0, 0);
-		const diffMs = now.getTime() - lockedDate.getTime();
+		const target = forDate ? new Date(forDate + "T00:00:00") : new Date();
+		target.setHours(0, 0, 0, 0);
+		const diffMs = target.getTime() - lockedDate.getTime();
 		return Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1;
 	}
 
@@ -113,12 +113,12 @@ export class NorthStarManager {
 		return Math.max(0, ctx.goal.timeWindowDays - this.getDayNumber(goalId) + 1);
 	}
 
-	async addGoal(text: string, timeWindowDays: number, context?: string): Promise<NorthStarGoal> {
+	async addGoal(text: string, timeWindowDays: number, context?: string): Promise<PromiseLandGoal> {
 		if (this.data.goalContexts.length >= MAX_GOALS) {
 			throw new Error(`Maximum of ${MAX_GOALS} concurrent goals allowed`);
 		}
 
-		const goal: NorthStarGoal = {
+		const goal: PromiseLandGoal = {
 			id: `ns-${Date.now()}`,
 			text,
 			...(context ? { context } : {}),

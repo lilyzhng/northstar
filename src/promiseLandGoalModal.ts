@@ -1,6 +1,6 @@
 import { App, Modal, Setting } from "obsidian";
 
-export class NorthStarGoalModal extends Modal {
+export class PromiseLandGoalModal extends Modal {
 	private goalText = "";
 	private timeWindowDays = 30;
 	private goalContext = "";
@@ -15,7 +15,7 @@ export class NorthStarGoalModal extends Modal {
 		const { contentEl } = this;
 		contentEl.empty();
 
-		contentEl.createEl("h3", { text: "Set Your North Star" });
+		contentEl.createEl("h3", { text: "Set Your Promise Land" });
 		contentEl.createEl("p", {
 			text: "Define your goal and lock it in. The goal cannot be changed — only archived and replaced.",
 			cls: "setting-item-description",
@@ -82,7 +82,7 @@ export class NorthStarGoalModal extends Modal {
 	}
 }
 
-export class NorthStarEditContextModal extends Modal {
+export class PromiseLandEditContextModal extends Modal {
 	private contextValue: string;
 	private onSubmit: (context: string) => void;
 
@@ -103,7 +103,7 @@ export class NorthStarEditContextModal extends Modal {
 		});
 
 		const textarea = contentEl.createEl("textarea", {
-			cls: "acta-northstar-context-textarea",
+			cls: "acta-promiseland-context-textarea",
 			attr: { placeholder: "e.g., Job posting URL, required skills, key milestones...", rows: "8" },
 		});
 		textarea.value = this.contextValue;

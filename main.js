@@ -22,7 +22,8 @@ __export(main_exports, {
   default: () => ActaTaskPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian12 = require("obsidian");
+var import_obsidian13 = require("obsidian");
+var import_child_process2 = require("child_process");
 
 // src/types.ts
 var DEFAULT_SETTINGS = {
@@ -33,12 +34,12 @@ var DEFAULT_SETTINGS = {
   topicSortOrder: "alphabetical",
   taskSortOrder: "incompleteFirst",
   anthropicApiKey: "",
-  northStarModel: "claude-sonnet-4-20250514"
+  promiseLandModel: "claude-sonnet-4-20250514"
 };
 var DEFAULT_DATA = {
   addedTasks: {}
 };
-var ACTA_TASK_VIEW_TYPE = "northstar-board";
+var ACTA_TASK_VIEW_TYPE = "promiseland-board";
 var DEFAULT_FEEDBACK_DATA = {
   addedFeedback: {}
 };
@@ -49,7 +50,7 @@ var DEFAULT_NEGATIVE_FEEDBACK_DATA = {
 };
 var ACTA_NEGATIVE_FEEDBACK_VIEW_TYPE = "acta-negative-feedback-board";
 var NEGATIVE_FEEDBACK_TRIGGER_TAGS = ["#\u{1F612}"];
-var ACTA_NORTHSTAR_VIEW_TYPE = "acta-northstar-board";
+var ACTA_PROMISELAND_VIEW_TYPE = "acta-promiseland-board";
 
 // src/taskBoardView.ts
 var import_obsidian = require("obsidian");
@@ -67,7 +68,7 @@ var TaskBoardView = class extends import_obsidian.ItemView {
     return ACTA_TASK_VIEW_TYPE;
   }
   getDisplayText() {
-    return "Northstar Board";
+    return "PromiseLand Board";
   }
   getIcon() {
     return "list-checks";
@@ -75,8 +76,8 @@ var TaskBoardView = class extends import_obsidian.ItemView {
   async onOpen() {
     const container = this.containerEl.children[1];
     container.empty();
-    container.addClass("northstar-container");
-    this.boardEl = container.createDiv({ cls: "northstar-board" });
+    container.addClass("promiseland-container");
+    this.boardEl = container.createDiv({ cls: "promiseland-board" });
     await this.refresh();
     this.registerEvents();
   }
@@ -112,11 +113,11 @@ var TaskBoardView = class extends import_obsidian.ItemView {
     if (!this.boardEl)
       return;
     this.boardEl.empty();
-    const header = this.boardEl.createDiv({ cls: "northstar-header" });
-    const titleRow = header.createDiv({ cls: "northstar-title-row" });
+    const header = this.boardEl.createDiv({ cls: "promiseland-header" });
+    const titleRow = header.createDiv({ cls: "promiseland-title-row" });
     titleRow.createEl("h4", { text: "Task Board" });
     const refreshBtn = titleRow.createEl("button", {
-      cls: "northstar-refresh-btn clickable-icon",
+      cls: "promiseland-refresh-btn clickable-icon",
       attr: { "aria-label": "Refresh" }
     });
     refreshBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`;
@@ -127,37 +128,37 @@ var TaskBoardView = class extends import_obsidian.ItemView {
       0
     );
     header.createDiv({
-      cls: "northstar-stats",
+      cls: "promiseland-stats",
       text: `${completedTasks}/${totalTasks} done across ${topics.length} topics`
     });
     if (topics.length === 0) {
       this.boardEl.createDiv({
-        cls: "northstar-empty",
+        cls: "promiseland-empty",
         text: "No tasks yet. Add checkboxes with inline hashtags (e.g. - [ ] #people do something) to see them here."
       });
       return;
     }
-    const list = this.boardEl.createDiv({ cls: "northstar-topics" });
+    const list = this.boardEl.createDiv({ cls: "promiseland-topics" });
     for (const topic of topics) {
       this.renderTopicSection(list, topic);
     }
   }
   renderTopicSection(parent, topic) {
-    const section = parent.createDiv({ cls: "northstar-topic-section" });
+    const section = parent.createDiv({ cls: "promiseland-topic-section" });
     const isCollapsed = this.collapsedTopics.has(topic.tag);
     const topicHeader = section.createDiv({
-      cls: "northstar-topic-header"
+      cls: "promiseland-topic-header"
     });
     const chevron = topicHeader.createSpan({
-      cls: `northstar-chevron ${isCollapsed ? "is-collapsed" : ""}`
+      cls: `promiseland-chevron ${isCollapsed ? "is-collapsed" : ""}`
     });
     chevron.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
     topicHeader.createSpan({
-      cls: "northstar-topic-tag",
+      cls: "promiseland-topic-tag",
       text: `#${topic.displayTag}`
     });
     topicHeader.createSpan({
-      cls: "northstar-topic-count",
+      cls: "promiseland-topic-count",
       text: `${topic.completedCount}/${topic.totalCount}`
     });
     topicHeader.addEventListener("click", () => {
@@ -169,7 +170,7 @@ var TaskBoardView = class extends import_obsidian.ItemView {
       this.refresh();
     });
     if (!isCollapsed) {
-      const taskList = section.createDiv({ cls: "northstar-list" });
+      const taskList = section.createDiv({ cls: "promiseland-list" });
       for (const task of topic.tasks) {
         if (!this.settings.showCompleted && task.completed)
           continue;
@@ -179,30 +180,30 @@ var TaskBoardView = class extends import_obsidian.ItemView {
   }
   renderTaskItem(parent, task) {
     const item = parent.createDiv({
-      cls: `northstar-item ${task.completed ? "is-completed" : ""}`
+      cls: `promiseland-item ${task.completed ? "is-completed" : ""}`
     });
     const checkbox = item.createEl("input", {
       type: "checkbox",
-      cls: "northstar-checkbox task-list-item-checkbox"
+      cls: "promiseland-checkbox task-list-item-checkbox"
     });
     checkbox.checked = task.completed;
     checkbox.addEventListener("click", async (e) => {
       e.preventDefault();
       const success = await this.toggler.toggleTask(task);
       if (!success) {
-        console.error("Northstar: Failed to toggle task", task.id);
+        console.error("PromiseLand: Failed to toggle task", task.id);
       }
     });
     item.createSpan({
-      cls: "northstar-text",
+      cls: "promiseland-text",
       text: task.text
     });
     if (this.settings.showSourceNote) {
       const metaContainer = item.createSpan({
-        cls: "northstar-meta"
+        cls: "promiseland-meta"
       });
       const badge = metaContainer.createSpan({
-        cls: "northstar-source-badge",
+        cls: "promiseland-source-badge",
         text: task.fileName
       });
       badge.addEventListener("click", async (e) => {
@@ -222,12 +223,12 @@ var TaskBoardView = class extends import_obsidian.ItemView {
         day: "numeric"
       });
       metaContainer.createSpan({
-        cls: "northstar-date-badge",
+        cls: "promiseland-date-badge",
         text: dateStr
       });
     }
     const removeBtn = item.createSpan({
-      cls: "northstar-remove-btn",
+      cls: "promiseland-remove-btn",
       text: "\xD7",
       attr: { title: "Remove from board" }
     });
@@ -262,8 +263,8 @@ var FeedbackBoardView = class extends import_obsidian2.ItemView {
   async onOpen() {
     const container = this.containerEl.children[1];
     container.empty();
-    container.addClass("northstar-container");
-    this.boardEl = container.createDiv({ cls: "northstar-board" });
+    container.addClass("promiseland-container");
+    this.boardEl = container.createDiv({ cls: "promiseland-board" });
     await this.refresh();
     this.registerEvents();
   }
@@ -299,48 +300,48 @@ var FeedbackBoardView = class extends import_obsidian2.ItemView {
     if (!this.boardEl)
       return;
     this.boardEl.empty();
-    const header = this.boardEl.createDiv({ cls: "northstar-header" });
-    const titleRow = header.createDiv({ cls: "northstar-title-row" });
+    const header = this.boardEl.createDiv({ cls: "promiseland-header" });
+    const titleRow = header.createDiv({ cls: "promiseland-title-row" });
     titleRow.createEl("h4", { text: "\u2764\uFE0F \u6B63\u53CD\u9988board" });
     const refreshBtn = titleRow.createEl("button", {
-      cls: "northstar-refresh-btn clickable-icon",
+      cls: "promiseland-refresh-btn clickable-icon",
       attr: { "aria-label": "Refresh" }
     });
     refreshBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`;
     refreshBtn.addEventListener("click", () => this.refresh());
     const totalItems = topics.reduce((sum, t) => sum + t.totalCount, 0);
     header.createDiv({
-      cls: "northstar-stats",
+      cls: "promiseland-stats",
       text: `${totalItems} items across ${topics.length} topics`
     });
     if (topics.length === 0) {
       this.boardEl.createDiv({
-        cls: "northstar-empty",
+        cls: "promiseland-empty",
         text: "No \u6B63\u53CD\u9988 items yet. Add notes with #\u6B63\u53CD\u9988 or #\u2764\uFE0F and a topic tag (e.g. #coding) to see them here."
       });
       return;
     }
-    const list = this.boardEl.createDiv({ cls: "northstar-topics" });
+    const list = this.boardEl.createDiv({ cls: "promiseland-topics" });
     for (const topic of topics) {
       this.renderTopicSection(list, topic);
     }
   }
   renderTopicSection(parent, topic) {
-    const section = parent.createDiv({ cls: "northstar-topic-section" });
+    const section = parent.createDiv({ cls: "promiseland-topic-section" });
     const isCollapsed = this.collapsedTopics.has(topic.tag);
     const topicHeader = section.createDiv({
-      cls: "northstar-topic-header"
+      cls: "promiseland-topic-header"
     });
     const chevron = topicHeader.createSpan({
-      cls: `northstar-chevron ${isCollapsed ? "is-collapsed" : ""}`
+      cls: `promiseland-chevron ${isCollapsed ? "is-collapsed" : ""}`
     });
     chevron.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
     topicHeader.createSpan({
-      cls: "northstar-topic-tag",
+      cls: "promiseland-topic-tag",
       text: `#${topic.displayTag}`
     });
     topicHeader.createSpan({
-      cls: "northstar-topic-count",
+      cls: "promiseland-topic-count",
       text: `${topic.totalCount}`
     });
     topicHeader.addEventListener("click", () => {
@@ -352,7 +353,7 @@ var FeedbackBoardView = class extends import_obsidian2.ItemView {
       this.refresh();
     });
     if (!isCollapsed) {
-      const itemList = section.createDiv({ cls: "northstar-list" });
+      const itemList = section.createDiv({ cls: "promiseland-list" });
       for (const item of topic.items) {
         this.renderFeedbackItem(itemList, item);
       }
@@ -360,18 +361,18 @@ var FeedbackBoardView = class extends import_obsidian2.ItemView {
   }
   renderFeedbackItem(parent, item) {
     const itemEl = parent.createDiv({
-      cls: "northstar-item acta-feedback-item"
+      cls: "promiseland-item acta-feedback-item"
     });
     itemEl.createSpan({
-      cls: "northstar-text acta-feedback-text",
+      cls: "promiseland-text acta-feedback-text",
       text: item.text
     });
     if (this.settings.showSourceNote) {
       const metaContainer = itemEl.createSpan({
-        cls: "northstar-meta"
+        cls: "promiseland-meta"
       });
       const badge = metaContainer.createSpan({
-        cls: "northstar-source-badge",
+        cls: "promiseland-source-badge",
         text: item.fileName
       });
       badge.addEventListener("click", async (e) => {
@@ -391,12 +392,12 @@ var FeedbackBoardView = class extends import_obsidian2.ItemView {
         day: "numeric"
       });
       metaContainer.createSpan({
-        cls: "northstar-date-badge",
+        cls: "promiseland-date-badge",
         text: dateStr
       });
     }
     const removeBtn = itemEl.createSpan({
-      cls: "northstar-remove-btn",
+      cls: "promiseland-remove-btn",
       text: "\xD7",
       attr: { title: "Remove from board" }
     });
@@ -431,8 +432,8 @@ var NegativeFeedbackBoardView = class extends import_obsidian3.ItemView {
   async onOpen() {
     const container = this.containerEl.children[1];
     container.empty();
-    container.addClass("northstar-container");
-    this.boardEl = container.createDiv({ cls: "northstar-board acta-negative-feedback-board" });
+    container.addClass("promiseland-container");
+    this.boardEl = container.createDiv({ cls: "promiseland-board acta-negative-feedback-board" });
     await this.refresh();
     this.registerEvents();
   }
@@ -468,48 +469,48 @@ var NegativeFeedbackBoardView = class extends import_obsidian3.ItemView {
     if (!this.boardEl)
       return;
     this.boardEl.empty();
-    const header = this.boardEl.createDiv({ cls: "northstar-header" });
-    const titleRow = header.createDiv({ cls: "northstar-title-row" });
+    const header = this.boardEl.createDiv({ cls: "promiseland-header" });
+    const titleRow = header.createDiv({ cls: "promiseland-title-row" });
     titleRow.createEl("h4", { text: "\u{1F612} \u8D1F\u53CD\u9988board" });
     const refreshBtn = titleRow.createEl("button", {
-      cls: "northstar-refresh-btn clickable-icon",
+      cls: "promiseland-refresh-btn clickable-icon",
       attr: { "aria-label": "Refresh" }
     });
     refreshBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`;
     refreshBtn.addEventListener("click", () => this.refresh());
     const totalItems = topics.reduce((sum, t) => sum + t.totalCount, 0);
     header.createDiv({
-      cls: "northstar-stats",
+      cls: "promiseland-stats",
       text: `${totalItems} items across ${topics.length} topics`
     });
     if (topics.length === 0) {
       this.boardEl.createDiv({
-        cls: "northstar-empty",
+        cls: "promiseland-empty",
         text: "No \u8D1F\u53CD\u9988 items yet. Add notes with #\u{1F612} and a topic tag (e.g. #work) to see them here."
       });
       return;
     }
-    const list = this.boardEl.createDiv({ cls: "northstar-topics" });
+    const list = this.boardEl.createDiv({ cls: "promiseland-topics" });
     for (const topic of topics) {
       this.renderTopicSection(list, topic);
     }
   }
   renderTopicSection(parent, topic) {
-    const section = parent.createDiv({ cls: "northstar-topic-section" });
+    const section = parent.createDiv({ cls: "promiseland-topic-section" });
     const isCollapsed = this.collapsedTopics.has(topic.tag);
     const topicHeader = section.createDiv({
-      cls: "northstar-topic-header"
+      cls: "promiseland-topic-header"
     });
     const chevron = topicHeader.createSpan({
-      cls: `northstar-chevron ${isCollapsed ? "is-collapsed" : ""}`
+      cls: `promiseland-chevron ${isCollapsed ? "is-collapsed" : ""}`
     });
     chevron.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
     topicHeader.createSpan({
-      cls: "northstar-topic-tag",
+      cls: "promiseland-topic-tag",
       text: `#${topic.displayTag}`
     });
     topicHeader.createSpan({
-      cls: "northstar-topic-count",
+      cls: "promiseland-topic-count",
       text: `${topic.totalCount}`
     });
     topicHeader.addEventListener("click", () => {
@@ -521,7 +522,7 @@ var NegativeFeedbackBoardView = class extends import_obsidian3.ItemView {
       this.refresh();
     });
     if (!isCollapsed) {
-      const itemList = section.createDiv({ cls: "northstar-list" });
+      const itemList = section.createDiv({ cls: "promiseland-list" });
       for (const item of topic.items) {
         this.renderFeedbackItem(itemList, item);
       }
@@ -529,18 +530,18 @@ var NegativeFeedbackBoardView = class extends import_obsidian3.ItemView {
   }
   renderFeedbackItem(parent, item) {
     const itemEl = parent.createDiv({
-      cls: "northstar-item acta-feedback-item acta-negative-feedback-item"
+      cls: "promiseland-item acta-feedback-item acta-negative-feedback-item"
     });
     itemEl.createSpan({
-      cls: "northstar-text acta-feedback-text",
+      cls: "promiseland-text acta-feedback-text",
       text: item.text
     });
     if (this.settings.showSourceNote) {
       const metaContainer = itemEl.createSpan({
-        cls: "northstar-meta"
+        cls: "promiseland-meta"
       });
       const badge = metaContainer.createSpan({
-        cls: "northstar-source-badge",
+        cls: "promiseland-source-badge",
         text: item.fileName
       });
       badge.addEventListener("click", async (e) => {
@@ -560,12 +561,12 @@ var NegativeFeedbackBoardView = class extends import_obsidian3.ItemView {
         day: "numeric"
       });
       metaContainer.createSpan({
-        cls: "northstar-date-badge",
+        cls: "promiseland-date-badge",
         text: dateStr
       });
     }
     const removeBtn = itemEl.createSpan({
-      cls: "northstar-remove-btn",
+      cls: "promiseland-remove-btn",
       text: "\xD7",
       attr: { title: "Remove from board" }
     });
@@ -577,12 +578,12 @@ var NegativeFeedbackBoardView = class extends import_obsidian3.ItemView {
   }
 };
 
-// src/northStarBoardView.ts
+// src/promiseLandBoardView.ts
 var import_obsidian5 = require("obsidian");
 
-// src/northStarGoalModal.ts
+// src/promiseLandGoalModal.ts
 var import_obsidian4 = require("obsidian");
-var NorthStarGoalModal = class extends import_obsidian4.Modal {
+var PromiseLandGoalModal = class extends import_obsidian4.Modal {
   constructor(app, onSubmit) {
     super(app);
     this.goalText = "";
@@ -593,7 +594,7 @@ var NorthStarGoalModal = class extends import_obsidian4.Modal {
   onOpen() {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.createEl("h3", { text: "Set Your North Star" });
+    contentEl.createEl("h3", { text: "Set Your Promise Land" });
     contentEl.createEl("p", {
       text: "Define your goal and lock it in. The goal cannot be changed \u2014 only archived and replaced.",
       cls: "setting-item-description"
@@ -633,7 +634,7 @@ var NorthStarGoalModal = class extends import_obsidian4.Modal {
     this.contentEl.empty();
   }
 };
-var NorthStarEditContextModal = class extends import_obsidian4.Modal {
+var PromiseLandEditContextModal = class extends import_obsidian4.Modal {
   constructor(app, currentContext, onSubmit) {
     super(app);
     this.contextValue = currentContext;
@@ -648,7 +649,7 @@ var NorthStarEditContextModal = class extends import_obsidian4.Modal {
       cls: "setting-item-description"
     });
     const textarea = contentEl.createEl("textarea", {
-      cls: "acta-northstar-context-textarea",
+      cls: "acta-promiseland-context-textarea",
       attr: { placeholder: "e.g., Job posting URL, required skills, key milestones...", rows: "8" }
     });
     textarea.value = this.contextValue;
@@ -668,17 +669,17 @@ var NorthStarEditContextModal = class extends import_obsidian4.Modal {
   }
 };
 
-// src/northStarBoardView.ts
+// src/promiseLandBoardView.ts
 var TOOL_DEFINITIONS = [
   {
     name: "get_today_date",
-    description: "Get date info, day number for the current goal, and whether a check-in already exists. Always call this first before observe_signals or run_assessment. Pass a date to query a specific day (e.g. yesterday), or omit for today.",
+    description: "Get date info, day number for the current goal, and whether a check-in already exists. ALWAYS call this first before observe_signals or run_assessment. When the user says 'check in for yesterday', pass date='yesterday'. The returned date MUST be used for all subsequent tool calls.",
     input_schema: {
       type: "object",
       properties: {
         date: {
           type: "string",
-          description: "Optional date in YYYY-MM-DD format. If omitted, returns today's date. Use this when the user wants to check in for a different day (e.g. yesterday)."
+          description: "Pass 'yesterday' when user asks for yesterday's check-in, or a YYYY-MM-DD date for a specific day. Omit for today."
         }
       },
       required: []
@@ -749,7 +750,7 @@ var TOOL_DEFINITIONS = [
     }
   }
 ];
-var NorthStarBoardView = class extends import_obsidian5.ItemView {
+var PromiseLandBoardView = class extends import_obsidian5.ItemView {
   constructor(leaf, manager, agent, llmClient, settings) {
     super(leaf);
     this.boardEl = null;
@@ -771,10 +772,10 @@ var NorthStarBoardView = class extends import_obsidian5.ItemView {
     this.settings = settings;
   }
   getViewType() {
-    return ACTA_NORTHSTAR_VIEW_TYPE;
+    return ACTA_PROMISELAND_VIEW_TYPE;
   }
   getDisplayText() {
-    return "North Star";
+    return "Promise Land";
   }
   getIcon() {
     return "star";
@@ -782,9 +783,9 @@ var NorthStarBoardView = class extends import_obsidian5.ItemView {
   async onOpen() {
     const container = this.containerEl.children[1];
     container.empty();
-    container.addClass("northstar-container");
+    container.addClass("promiseland-container");
     this.activeGoalId = this.manager.getActiveGoalId();
-    this.boardEl = container.createDiv({ cls: "acta-northstar-board" });
+    this.boardEl = container.createDiv({ cls: "acta-promiseland-board" });
     this.renderBoard();
   }
   async onClose() {
@@ -827,12 +828,12 @@ var NorthStarBoardView = class extends import_obsidian5.ItemView {
   renderHeader() {
     if (!this.boardEl)
       return;
-    const header = this.boardEl.createDiv({ cls: "acta-northstar-header" });
-    const titleRow = header.createDiv({ cls: "acta-northstar-title-row" });
-    titleRow.createEl("h4", { text: "North Star" });
-    const btnGroup = titleRow.createDiv({ cls: "acta-northstar-btn-group" });
+    const header = this.boardEl.createDiv({ cls: "acta-promiseland-header" });
+    const titleRow = header.createDiv({ cls: "acta-promiseland-title-row" });
+    titleRow.createEl("h4", { text: "Promise Land" });
+    const btnGroup = titleRow.createDiv({ cls: "acta-promiseland-btn-group" });
     const refreshBtn = btnGroup.createEl("button", {
-      cls: "acta-northstar-refresh-btn clickable-icon",
+      cls: "acta-promiseland-refresh-btn clickable-icon",
       attr: { "aria-label": "Refresh" }
     });
     refreshBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`;
@@ -841,11 +842,11 @@ var NorthStarBoardView = class extends import_obsidian5.ItemView {
   renderEmptyGoalState() {
     if (!this.boardEl)
       return;
-    const empty = this.boardEl.createDiv({ cls: "acta-northstar-empty" });
+    const empty = this.boardEl.createDiv({ cls: "acta-promiseland-empty" });
     empty.createEl("p", { text: "No goal set yet." });
     const setBtn = empty.createEl("button", {
-      cls: "acta-northstar-set-goal-btn",
-      text: "Set Your North Star"
+      cls: "acta-promiseland-set-goal-btn",
+      text: "Set Your Promise Land"
     });
     setBtn.addEventListener("click", () => this.openGoalModal());
   }
@@ -857,13 +858,13 @@ var NorthStarBoardView = class extends import_obsidian5.ItemView {
   renderGoalsSection(goals) {
     if (!this.boardEl)
       return;
-    const section = this.boardEl.createDiv({ cls: "acta-northstar-goals-section" });
+    const section = this.boardEl.createDiv({ cls: "acta-promiseland-goals-section" });
     const activeIndex = goals.findIndex((g) => g.id === this.activeGoalId);
     const currentIndex = activeIndex >= 0 ? activeIndex : 0;
     const activeGoal = goals[currentIndex];
-    const carousel = section.createDiv({ cls: "acta-northstar-goal-carousel" });
+    const carousel = section.createDiv({ cls: "acta-promiseland-goal-carousel" });
     const leftArrow = carousel.createEl("button", {
-      cls: "acta-northstar-carousel-arrow",
+      cls: "acta-promiseland-carousel-arrow",
       text: "\u2039",
       attr: { "aria-label": "Previous goal" }
     });
@@ -873,10 +874,10 @@ var NorthStarBoardView = class extends import_obsidian5.ItemView {
         this.switchActiveGoal(goals[currentIndex - 1].id);
       }
     });
-    const cardWrapper = carousel.createDiv({ cls: "acta-northstar-carousel-card-wrapper" });
+    const cardWrapper = carousel.createDiv({ cls: "acta-promiseland-carousel-card-wrapper" });
     this.renderGoalCard(cardWrapper, activeGoal);
     const rightArrow = carousel.createEl("button", {
-      cls: "acta-northstar-carousel-arrow",
+      cls: "acta-promiseland-carousel-arrow",
       text: "\u203A",
       attr: { "aria-label": "Next goal" }
     });
@@ -887,10 +888,10 @@ var NorthStarBoardView = class extends import_obsidian5.ItemView {
       }
     });
     if (goals.length > 1) {
-      const dots = section.createDiv({ cls: "acta-northstar-carousel-dots" });
+      const dots = section.createDiv({ cls: "acta-promiseland-carousel-dots" });
       for (let i = 0; i < goals.length; i++) {
         const dot = dots.createDiv({
-          cls: `acta-northstar-carousel-dot${i === currentIndex ? " is-active" : ""}`
+          cls: `acta-promiseland-carousel-dot${i === currentIndex ? " is-active" : ""}`
         });
         dot.addEventListener("click", () => {
           if (i !== currentIndex && !this.isSending) {
@@ -900,7 +901,7 @@ var NorthStarBoardView = class extends import_obsidian5.ItemView {
       }
     }
     if (this.manager.canAddGoal()) {
-      const addBtn = section.createDiv({ cls: "acta-northstar-add-goal-btn" });
+      const addBtn = section.createDiv({ cls: "acta-promiseland-add-goal-btn" });
       addBtn.textContent = "+";
       addBtn.setAttribute("aria-label", "Add another goal");
       addBtn.addEventListener("click", () => this.openGoalModal());
@@ -908,32 +909,38 @@ var NorthStarBoardView = class extends import_obsidian5.ItemView {
   }
   renderGoalCard(parent, goal) {
     const isActive = goal.id === this.activeGoalId;
-    const card = parent.createDiv({ cls: `acta-northstar-goal-card${isActive ? " is-active" : ""}` });
+    const card = parent.createDiv({ cls: `acta-promiseland-goal-card${isActive ? " is-active" : ""}` });
     card.addEventListener("click", () => {
       if (this.activeGoalId !== goal.id && !this.isSending) {
         this.switchActiveGoal(goal.id);
       }
     });
-    const goalText = card.createDiv({ cls: "acta-northstar-goal-text" });
+    const topRow = card.createDiv({ cls: "acta-promiseland-goal-top-row" });
+    const completeBtn = topRow.createEl("button", {
+      cls: "acta-promiseland-complete-btn clickable-icon",
+      attr: { "aria-label": "Mark goal as completed" }
+    });
+    completeBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>`;
+    completeBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.completeGoal(goal);
+    });
+    const goalText = topRow.createDiv({ cls: "acta-promiseland-goal-text" });
     goalText.createEl("span", { text: goal.text });
-    const badges = card.createDiv({ cls: "acta-northstar-goal-badges" });
+    const badges = card.createDiv({ cls: "acta-promiseland-goal-badges" });
     const dayNum = this.manager.getDayNumber(goal.id);
     badges.createEl("span", {
-      cls: "acta-northstar-badge",
+      cls: "acta-promiseland-badge",
       text: `Day ${dayNum} of ${goal.timeWindowDays}`
-    });
-    badges.createEl("span", {
-      cls: "acta-northstar-badge acta-northstar-badge-phase",
-      text: goal.currentPhase
     });
     const daysLeft = this.manager.getDaysLeft(goal.id);
     badges.createEl("span", {
-      cls: `acta-northstar-badge ${daysLeft <= 7 ? "acta-northstar-badge-urgent" : ""}`,
+      cls: `acta-promiseland-badge ${daysLeft <= 7 ? "acta-promiseland-badge-urgent" : ""}`,
       text: `${daysLeft}d left`
     });
     const contextLink = badges.createEl("span", {
-      cls: "acta-northstar-goal-context-link",
-      text: goal.context ? "edit context" : "+ Add context",
+      cls: "acta-promiseland-goal-context-link",
+      text: goal.context ? "edit context" : "+ context",
       attr: { "aria-label": goal.context ? "Edit context" : "Add reference context" }
     });
     contextLink.addEventListener("click", (e) => {
@@ -941,76 +948,234 @@ var NorthStarBoardView = class extends import_obsidian5.ItemView {
       this.openEditContextModal(goal);
     });
   }
+  async completeGoal(goal) {
+    const confirm = window.confirm(
+      `Mark "${goal.text}" as completed and archive it?
+
+This will remove it from the active goals list. Assessment history is preserved.`
+    );
+    if (!confirm)
+      return;
+    await this.manager.archiveGoal(goal.id);
+    this.showCelebration(goal);
+    const remaining = this.manager.getGoals();
+    if (remaining.length > 0) {
+      this.activeGoalId = remaining[0].id;
+      this.manager.setActiveGoalId(remaining[0].id);
+    } else {
+      this.activeGoalId = null;
+    }
+    setTimeout(() => this.renderBoard(), 4e3);
+  }
+  showCelebration(goal) {
+    const overlay = document.body.createDiv({ cls: "promiseland-celebration-overlay" });
+    const content = overlay.createDiv({ cls: "promiseland-celebration-content" });
+    content.createEl("div", { cls: "promiseland-celebration-emoji", text: "\u2B50" });
+    content.createEl("div", { cls: "promiseland-celebration-title", text: "Goal Complete!" });
+    content.createEl("div", { cls: "promiseland-celebration-goal", text: goal.text });
+    const dayNum = this.manager.getDayNumber(goal.id);
+    content.createEl("div", {
+      cls: "promiseland-celebration-stats",
+      text: `${dayNum} days of focus. You shipped it.`
+    });
+    const colors = ["#f39c12", "#e74c3c", "#27ae60", "#3498db", "#9b59b6", "#e67e22", "#1abc9c"];
+    for (let i = 0; i < 80; i++) {
+      const particle = overlay.createDiv({ cls: "promiseland-confetti" });
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      const left = Math.random() * 100;
+      const delay = Math.random() * 1.5;
+      const duration = 2 + Math.random() * 2;
+      const size = 6 + Math.random() * 8;
+      const rotation = Math.random() * 360;
+      particle.style.cssText = `
+				left: ${left}%;
+				background: ${color};
+				width: ${size}px;
+				height: ${size * 0.6}px;
+				animation-delay: ${delay}s;
+				animation-duration: ${duration}s;
+				transform: rotate(${rotation}deg);
+			`;
+    }
+    if (!document.getElementById("promiseland-celebration-styles")) {
+      const style = document.createElement("style");
+      style.id = "promiseland-celebration-styles";
+      style.textContent = `
+				.promiseland-celebration-overlay {
+					position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+					z-index: 10000; pointer-events: none;
+					display: flex; align-items: center; justify-content: center;
+					animation: promiseland-fade-in 0.3s ease-out;
+				}
+				.promiseland-celebration-content {
+					text-align: center; padding: 40px;
+					background: var(--background-primary);
+					border: 2px solid var(--text-accent);
+					border-radius: 16px;
+					box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+					pointer-events: auto;
+					animation: promiseland-pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+				}
+				.promiseland-celebration-emoji {
+					font-size: 64px; margin-bottom: 12px;
+					animation: promiseland-pulse 1s ease-in-out infinite;
+				}
+				.promiseland-celebration-title {
+					font-size: 28px; font-weight: 700;
+					color: var(--text-normal); margin-bottom: 8px;
+				}
+				.promiseland-celebration-goal {
+					font-size: 16px; color: var(--text-muted);
+					max-width: 400px; margin: 0 auto 12px;
+				}
+				.promiseland-celebration-stats {
+					font-size: 14px; color: var(--text-faint);
+				}
+				.promiseland-confetti {
+					position: fixed; top: -10px;
+					border-radius: 2px;
+					animation: promiseland-confetti-fall linear forwards;
+					pointer-events: none;
+				}
+				@keyframes promiseland-confetti-fall {
+					0% { top: -10px; opacity: 1; }
+					100% { top: 110vh; opacity: 0; transform: rotate(720deg) translateX(100px); }
+				}
+				@keyframes promiseland-pop-in {
+					0% { transform: scale(0.5); opacity: 0; }
+					100% { transform: scale(1); opacity: 1; }
+				}
+				@keyframes promiseland-pulse {
+					0%, 100% { transform: scale(1); }
+					50% { transform: scale(1.2); }
+				}
+				@keyframes promiseland-fade-in {
+					0% { opacity: 0; }
+					100% { opacity: 1; }
+				}
+			`;
+      document.head.appendChild(style);
+    }
+    setTimeout(() => overlay.remove(), 4e3);
+  }
   formatCategoryName(category) {
     const names = {
-      goalDirectDeepWork: "Focused Deep Work",
-      taskCompletion: "Task Completion",
-      reflectionDepth: "Reflection Depth",
-      pipelineActivity: "Pipeline Activity",
-      feedbackSignals: "Feedback Signals"
+      build: "Build + Learn",
+      ship: "Ship",
+      learn: "Build + Learn"
+      // Legacy: learn is now merged into build
     };
     return names[category] || category;
   }
   openGoalModal() {
-    new NorthStarGoalModal(this.app, async (text, days, context) => {
+    new PromiseLandGoalModal(this.app, async (text, days, context) => {
       await this.manager.addGoal(text, days, context || void 0);
-      new import_obsidian5.Notice("North Star goal locked in!");
+      new import_obsidian5.Notice("Promise Land goal locked in!");
       this.renderBoard();
     }).open();
   }
   openEditContextModal(goal) {
-    new NorthStarEditContextModal(this.app, goal.context || "", async (context) => {
+    new PromiseLandEditContextModal(this.app, goal.context || "", async (context) => {
       await this.manager.updateGoalContext(goal.id, context);
       new import_obsidian5.Notice(context ? "Goal context updated!" : "Goal context cleared.");
       this.renderBoard();
     }).open();
   }
   // ── Check-in note creation ──
-  async createCheckInNote(assessment, goal) {
-    const folderPath = "NorthStar/check-ins";
-    const goalSuffix = this.manager.getGoals().length > 1 ? ` (${goal.id.slice(-6)})` : "";
-    const filePath = `${folderPath}/North Star Check-in \u2014 ${assessment.date}${goalSuffix}.md`;
+  async createCheckInNote(assessment, goal, signals) {
+    var _a, _b;
+    const folderPath = "PromiseLand/check-ins";
+    const goalSuffix = this.manager.getGoals().length > 1 ? ` \u2014 ${goal.text.slice(0, 40).replace(/[\\/:*?"<>|]/g, "").trim()}` : "";
+    const filePath = `${folderPath}/Promise Land Check-in \u2014 ${assessment.date}${goalSuffix}.md`;
     if (!this.app.vault.getAbstractFileByPath(folderPath)) {
       await this.app.vault.createFolder(folderPath);
     }
     const scoreColor = (pct) => pct >= 70 ? "#27ae60" : pct >= 40 ? "#f39c12" : "#e74c3c";
     const buildBar = (pct) => {
       const color = scoreColor(pct);
-      return `<div style="height:6px;background:#e0e0e0;border-radius:3px;overflow:hidden;margin:4px 0 6px 0"><div style="height:100%;width:${Math.min(100, Math.max(0, pct))}%;background:${color};border-radius:3px"></div></div>`;
+      return `<div style="height:8px;background:#e0e0e0;border-radius:4px;overflow:hidden;margin:6px 0 10px 0"><div style="height:100%;width:${Math.min(100, Math.max(0, pct))}%;background:${color};border-radius:4px"></div></div>`;
     };
-    const overallPct = assessment.overallScore;
-    const overallColor = scoreColor(overallPct);
+    const overallColor = scoreColor(assessment.overallScore);
+    const knownFiles = (((_a = signals == null ? void 0 : signals.vaultActivity) == null ? void 0 : _a.modifiedFiles) || []).map((f) => f.fileName.replace(/\.md$/, ""));
+    const autoLink = (text) => {
+      let result = text;
+      for (const name of knownFiles) {
+        if (name.length < 4)
+          continue;
+        const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const regex = new RegExp(`(?<!\\[\\[)\\b${escaped}\\b(?!\\]\\])`, "gi");
+        result = result.replace(regex, `[[${name}]]`);
+      }
+      return result;
+    };
     const breakdownHtml = assessment.signalBreakdown.map((s) => {
       const pct = s.maxScore > 0 ? Math.round(s.score / s.maxScore * 100) : 0;
-      return `<div style="margin-bottom:14px">
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px"><span style="font-weight:500;font-size:0.9em">${this.formatCategoryName(s.category)}</span><span style="font-size:0.85em;color:#888">${Math.round(s.score)}/${Math.round(s.maxScore)}</span></div>
+      let reasoning = s.reasoning.startsWith("- ") ? s.reasoning : s.reasoning.split(". ").filter(Boolean).map((pt) => `- ${pt.trim().replace(/\.$/, "")}`).join("\n");
+      reasoning = autoLink(reasoning);
+      return `### ${this.formatCategoryName(s.category)} \u2014 ${Math.round(s.score)}/${Math.round(s.maxScore)}
+
 ${buildBar(pct)}
-<div style="font-size:0.82em;color:#888;line-height:1.3">${s.reasoning}</div>
-</div>`;
-    }).join("\n");
-    const driftHtml = assessment.driftIndicators.length > 0 ? assessment.driftIndicators.map((d) => `<div style="border-left:2px solid #e74c3c;padding:6px 10px;margin-bottom:4px;font-size:0.9em;background:rgba(231,76,60,0.06);border-radius:0 4px 4px 0">${d}</div>`).join("\n") : `<div style="font-size:0.9em;color:#888">None</div>`;
-    const momentumHtml = assessment.momentumIndicators.length > 0 ? assessment.momentumIndicators.map((m) => `<div style="border-left:2px solid #27ae60;padding:6px 10px;margin-bottom:4px;font-size:0.9em;background:rgba(39,174,96,0.06);border-radius:0 4px 4px 0">${m}</div>`).join("\n") : `<div style="font-size:0.9em;color:#888">None</div>`;
+
+${reasoning}`;
+    }).join("\n\n");
+    const driftMd = assessment.driftIndicators.length > 0 ? assessment.driftIndicators.map((d) => `- ${autoLink(d)}`).join("\n") : "None";
+    const momentumMd = assessment.momentumIndicators.length > 0 ? assessment.momentumIndicators.map((m) => `- ${autoLink(m)}`).join("\n") : "None";
+    let daySummaryMd = "";
+    const modifiedFiles = ((_b = signals == null ? void 0 : signals.vaultActivity) == null ? void 0 : _b.modifiedFiles) || [];
+    if (modifiedFiles.length > 0) {
+      const categorize = (folder) => {
+        if (folder.startsWith("Build"))
+          return "Build";
+        if (folder.startsWith("Learn"))
+          return "Learn";
+        if (folder.startsWith("Job Diary"))
+          return "Job Diary";
+        if (folder.startsWith("2026") || folder.startsWith("2025") || folder.startsWith("2027"))
+          return "Journal";
+        if (folder.startsWith("People"))
+          return "People";
+        if (folder.startsWith("PromiseLand"))
+          return "PromiseLand";
+        if (folder.startsWith("Projects"))
+          return "Build";
+        return folder.split("/")[0] || "Root";
+      };
+      const rows = modifiedFiles.map((f) => {
+        const category = categorize(f.folder);
+        const baseName = f.fileName.replace(/\.md$/, "");
+        const link = `[[${baseName}]]`;
+        const type = f.createdToday ? "New" : "Modified";
+        const description = f.headings.length > 0 ? f.headings.slice(0, 3).join(", ") : "";
+        return `| **${category}** | ${link} | ${type} | ${description} |`;
+      });
+      daySummaryMd = `### What Changed Today
+
+| Category | Item | Type | Description |
+| --- | --- | --- | --- |
+${rows.join("\n")}
+
+---
+`;
+    }
     const content = `**Goal:** ${goal.text}
 **Day ${assessment.dayNumber} of ${goal.timeWindowDays}** | Phase: ${goal.currentPhase}
 
-<div style="text-align:center;padding:12px 0 4px 0">
-<span style="font-size:2.5em;font-weight:700;color:${overallColor}">${assessment.overallScore}</span><span style="font-size:1em;color:#888">/100</span>
-<div style="font-size:0.8em;color:#888;margin-top:4px">Day ${assessment.dayNumber} \u2014 ${assessment.date}</div>
-</div>
+---
 
-### Signal Breakdown
+${daySummaryMd}
+## <span style="color:${overallColor}">${assessment.overallScore}</span>/100
 
 ${breakdownHtml}
 
 ---
 
-### Drift Indicators
+### Drift
 
-${driftHtml}
+${driftMd}
 
-### Momentum Indicators
+### Momentum
 
-${momentumHtml}
+${momentumMd}
 `;
     const existing = this.app.vault.getAbstractFileByPath(filePath);
     if (existing) {
@@ -1019,16 +1184,80 @@ ${momentumHtml}
       await this.app.vault.create(filePath, content);
     }
   }
+  // ── Day Summary Table ──
+  async updateDaySummaryTable(dateStr, signals) {
+    const compactDate = dateStr.replace(/-/g, "");
+    const year = dateStr.slice(0, 4);
+    const dailyNotePath = `${year}/${compactDate}.md`;
+    const dailyNote = this.app.vault.getAbstractFileByPath(dailyNotePath);
+    if (!dailyNote || !(dailyNote instanceof import_obsidian5.TFile))
+      return;
+    const modifiedFiles = signals.vaultActivity.modifiedFiles || [];
+    if (modifiedFiles.length === 0)
+      return;
+    const categorize = (folder) => {
+      if (folder.startsWith("Build"))
+        return "Build";
+      if (folder.startsWith("Learn"))
+        return "Learn";
+      if (folder.startsWith("Job Diary"))
+        return "Job Diary";
+      if (folder.startsWith("2026") || folder.startsWith("2025") || folder.startsWith("2027"))
+        return "Journal";
+      if (folder.startsWith("People"))
+        return "People";
+      if (folder.startsWith("PromiseLand"))
+        return "PromiseLand";
+      if (folder.startsWith("Projects"))
+        return "Build";
+      return folder.split("/")[0] || "Root";
+    };
+    const rows = modifiedFiles.map((f) => {
+      const category = categorize(f.folder);
+      const baseName = f.fileName.replace(/\.md$/, "");
+      const link = `[[${baseName}]]`;
+      const type = f.createdToday ? "New" : "Modified";
+      const description = f.headings.length > 0 ? f.headings.slice(0, 3).join(", ") : "";
+      return `| **${category}** | ${link} | ${type} | ${description} |`;
+    });
+    const table = `| Category | Item | Type | Description |
+| --- | --- | --- | --- |
+${rows.join("\n")}`;
+    const content = await this.app.vault.read(dailyNote);
+    const lines = content.split("\n");
+    let sectionStart = -1;
+    let sectionEnd = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (/^#{1,6}\s+Day\s+Summary\s+Table/i.test(lines[i])) {
+        sectionStart = i;
+        for (let j = i + 1; j < lines.length; j++) {
+          if (/^#{1,6}\s+/.test(lines[j])) {
+            sectionEnd = j;
+            break;
+          }
+        }
+        if (sectionEnd === -1)
+          sectionEnd = lines.length;
+        break;
+      }
+    }
+    if (sectionStart === -1)
+      return;
+    const before = lines.slice(0, sectionStart + 1);
+    const after = lines.slice(sectionEnd);
+    const updated = [...before, "", table, "", ...after].join("\n");
+    await this.app.vault.modify(dailyNote, updated);
+  }
   // ── Check-in note link (inline in chat) ──
   renderCheckInLink(parent, assessment, goal) {
-    const goalSuffix = this.manager.getGoals().length > 1 ? ` (${goal.id.slice(-6)})` : "";
-    const notePath = `NorthStar/check-ins/North Star Check-in \u2014 ${assessment.date}${goalSuffix}.md`;
-    const link = parent.createDiv({ cls: "acta-northstar-checkin-link" });
-    const scoreClass = assessment.overallScore >= 70 ? "acta-northstar-score-good" : assessment.overallScore >= 40 ? "acta-northstar-score-mid" : "acta-northstar-score-low";
-    link.createEl("span", { cls: `acta-northstar-checkin-score ${scoreClass}`, text: `${assessment.overallScore}/100` });
+    const goalSuffix = this.manager.getGoals().length > 1 ? ` \u2014 ${goal.text.slice(0, 40).replace(/[\\/:*?"<>|]/g, "").trim()}` : "";
+    const notePath = `PromiseLand/check-ins/Promise Land Check-in \u2014 ${assessment.date}${goalSuffix}.md`;
+    const link = parent.createDiv({ cls: "acta-promiseland-checkin-link" });
+    const scoreClass = assessment.overallScore >= 70 ? "acta-promiseland-score-good" : assessment.overallScore >= 40 ? "acta-promiseland-score-mid" : "acta-promiseland-score-low";
+    link.createEl("span", { cls: `acta-promiseland-checkin-score ${scoreClass}`, text: `${assessment.overallScore}/100` });
     const goalLabel = this.manager.getGoals().length > 1 ? ` \u2014 ${goal.text.slice(0, 30)}${goal.text.length > 30 ? "..." : ""}` : "";
-    link.createEl("span", { cls: "acta-northstar-checkin-label", text: ` \u2014 Day ${assessment.dayNumber} Check-in${goalLabel}` });
-    link.createEl("span", { cls: "acta-northstar-checkin-open", text: "Open note \u2197" });
+    link.createEl("span", { cls: "acta-promiseland-checkin-label", text: ` \u2014 Day ${assessment.dayNumber} Check-in${goalLabel}` });
+    link.createEl("span", { cls: "acta-promiseland-checkin-open", text: "Open note \u2197" });
     link.addEventListener("click", () => {
       this.app.workspace.openLinkText(notePath, "", false);
     });
@@ -1037,9 +1266,9 @@ ${momentumHtml}
   renderTinkerChat() {
     if (!this.boardEl || !this.activeGoalId)
       return;
-    const container = this.boardEl.createDiv({ cls: "acta-northstar-tinker-container" });
+    const container = this.boardEl.createDiv({ cls: "acta-promiseland-tinker-container" });
     container.createEl("h5", { text: "Tinker" });
-    const messagesEl = container.createDiv({ cls: "acta-northstar-tinker-messages" });
+    const messagesEl = container.createDiv({ cls: "acta-promiseland-tinker-messages" });
     this.chatMessagesEl = messagesEl;
     const messages = this.manager.getTinkerMessages(this.activeGoalId);
     for (const msg of messages) {
@@ -1055,43 +1284,43 @@ ${momentumHtml}
       }
       this.appendMessageBubble(messagesEl, msg);
     }
-    const inputContainer = container.createDiv({ cls: "acta-northstar-input-container" });
-    const inputBox = inputContainer.createDiv({ cls: "acta-northstar-input-box" });
+    const inputContainer = container.createDiv({ cls: "acta-promiseland-input-container" });
+    const inputBox = inputContainer.createDiv({ cls: "acta-promiseland-input-box" });
     const textarea = inputBox.createEl("textarea", {
-      cls: "acta-northstar-input",
+      cls: "acta-promiseland-input",
       attr: { placeholder: "Ask Tinker about your goal... (@ to mention files)", rows: "3" }
     });
-    this.fileChipsEl = inputBox.createDiv({ cls: "acta-northstar-file-chips" });
+    this.fileChipsEl = inputBox.createDiv({ cls: "acta-promiseland-file-chips" });
     this.referencedFiles = [];
     this.updateFileChips();
-    this.mentionDropdownEl = inputContainer.createDiv({ cls: "acta-northstar-mention-dropdown" });
+    this.mentionDropdownEl = inputContainer.createDiv({ cls: "acta-promiseland-mention-dropdown" });
     this.mentionDropdownEl.style.display = "none";
-    const toolbar = inputBox.createDiv({ cls: "acta-northstar-input-toolbar" });
+    const toolbar = inputBox.createDiv({ cls: "acta-promiseland-input-toolbar" });
     const models = [
       { value: "claude-haiku-4-5-20251001", label: "Haiku" },
       { value: "claude-sonnet-4-20250514", label: "Sonnet" },
       { value: "claude-opus-4-6", label: "Opus" }
     ];
-    const currentModel = models.find((m) => m.value === this.settings.northStarModel);
-    const modelSelector = toolbar.createDiv({ cls: "acta-northstar-model-selector" });
-    const modelBtn = modelSelector.createDiv({ cls: "acta-northstar-model-btn" });
+    const currentModel = models.find((m) => m.value === this.settings.promiseLandModel);
+    const modelSelector = toolbar.createDiv({ cls: "acta-promiseland-model-selector" });
+    const modelBtn = modelSelector.createDiv({ cls: "acta-promiseland-model-btn" });
     const modelLabel = modelBtn.createEl("span", { text: (currentModel == null ? void 0 : currentModel.label) || "Sonnet" });
-    modelBtn.createEl("span", { cls: "acta-northstar-model-chevron", text: "\u25B4" });
-    const dropdown = modelSelector.createDiv({ cls: "acta-northstar-model-dropdown" });
+    modelBtn.createEl("span", { cls: "acta-promiseland-model-chevron", text: "\u25B4" });
+    const dropdown = modelSelector.createDiv({ cls: "acta-promiseland-model-dropdown" });
     for (const m of models) {
       const option = dropdown.createDiv({
-        cls: `acta-northstar-model-option ${m.value === this.settings.northStarModel ? "is-selected" : ""}`,
+        cls: `acta-promiseland-model-option ${m.value === this.settings.promiseLandModel ? "is-selected" : ""}`,
         text: m.label
       });
       option.addEventListener("click", () => {
-        this.settings.northStarModel = m.value;
+        this.settings.promiseLandModel = m.value;
         modelLabel.textContent = m.label;
-        dropdown.querySelectorAll(".acta-northstar-model-option").forEach((el) => el.removeClass("is-selected"));
+        dropdown.querySelectorAll(".acta-promiseland-model-option").forEach((el) => el.removeClass("is-selected"));
         option.addClass("is-selected");
       });
     }
     const sendBtn = toolbar.createEl("button", {
-      cls: "acta-northstar-send-btn",
+      cls: "acta-promiseland-send-btn",
       attr: { "aria-label": "Send" }
     });
     sendBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`;
@@ -1143,63 +1372,65 @@ ${momentumHtml}
   }
   appendMessageBubble(container, msg) {
     const bubble = container.createDiv({
-      cls: `acta-northstar-tinker-bubble acta-northstar-tinker-bubble-${msg.role}`
+      cls: `acta-promiseland-tinker-bubble acta-promiseland-tinker-bubble-${msg.role}`
     });
     if (msg.role === "user" && msg.referencedFiles && msg.referencedFiles.length > 0) {
-      const refsEl = bubble.createDiv({ cls: "acta-northstar-bubble-refs" });
+      const refsEl = bubble.createDiv({ cls: "acta-promiseland-bubble-refs" });
       for (const ref of msg.referencedFiles) {
-        refsEl.createSpan({ cls: "acta-northstar-bubble-ref-chip", text: `@${ref.basename}` });
+        refsEl.createSpan({ cls: "acta-promiseland-bubble-ref-chip", text: `@${ref.basename}` });
       }
     }
-    const contentEl = bubble.createDiv({ cls: "acta-northstar-tinker-bubble-content" });
+    const contentEl = bubble.createDiv({ cls: "acta-promiseland-tinker-bubble-content" });
     import_obsidian5.MarkdownRenderer.renderMarkdown(msg.content, contentEl, "", this);
     return bubble;
   }
   // ── Tool step indicators ──
   renderToolStep(container, label) {
-    const step = container.createDiv({ cls: "acta-northstar-tool-step" });
-    const indicator = step.createSpan({ cls: "acta-northstar-step-indicator" });
+    const step = container.createDiv({ cls: "acta-promiseland-tool-step" });
+    const indicator = step.createSpan({ cls: "acta-promiseland-step-indicator" });
     indicator.textContent = "\u25CF";
-    step.createSpan({ cls: "acta-northstar-step-label", text: label });
-    step.addClass("acta-northstar-step-running");
+    step.createSpan({ cls: "acta-promiseland-step-label", text: label });
+    step.addClass("acta-promiseland-step-running");
     container.scrollTop = container.scrollHeight;
     return step;
   }
   renderToolSubstep(parent, text, status) {
-    const sub = parent.createDiv({ cls: "acta-northstar-tool-substep" });
-    const indicator = sub.createSpan({ cls: "acta-northstar-step-indicator" });
+    const sub = parent.createDiv({ cls: "acta-promiseland-tool-substep" });
+    const indicator = sub.createSpan({ cls: "acta-promiseland-step-indicator" });
     indicator.textContent = status === "done" ? "\u2713" : "\u25CF";
-    sub.createSpan({ cls: "acta-northstar-step-label", text });
-    sub.addClass(status === "done" ? "acta-northstar-step-done" : "acta-northstar-step-running");
+    sub.createSpan({ cls: "acta-promiseland-step-label", text });
+    sub.addClass(status === "done" ? "acta-promiseland-step-done" : "acta-promiseland-step-running");
     return sub;
   }
   completeToolStep(stepEl, detail) {
-    stepEl.removeClass("acta-northstar-step-running");
-    stepEl.addClass("acta-northstar-step-done");
-    const indicator = stepEl.querySelector(".acta-northstar-step-indicator");
+    stepEl.removeClass("acta-promiseland-step-running");
+    stepEl.addClass("acta-promiseland-step-done");
+    const indicator = stepEl.querySelector(".acta-promiseland-step-indicator");
     if (indicator)
       indicator.textContent = "\u2713";
     if (detail) {
-      stepEl.createSpan({ cls: "acta-northstar-step-detail", text: ` \u2014 ${detail}` });
+      stepEl.createSpan({ cls: "acta-promiseland-step-detail", text: ` \u2014 ${detail}` });
     }
   }
   // ── Typing indicator helpers ──
   addTypingIndicator(messagesEl) {
-    const typingEl = messagesEl.createDiv({ cls: "acta-northstar-tinker-typing" });
-    typingEl.createSpan({ cls: "acta-northstar-tinker-dot" });
-    typingEl.createSpan({ cls: "acta-northstar-tinker-dot" });
-    typingEl.createSpan({ cls: "acta-northstar-tinker-dot" });
+    const typingEl = messagesEl.createDiv({ cls: "acta-promiseland-tinker-typing" });
+    typingEl.createSpan({ cls: "acta-promiseland-tinker-dot" });
+    typingEl.createSpan({ cls: "acta-promiseland-tinker-dot" });
+    typingEl.createSpan({ cls: "acta-promiseland-tinker-dot" });
     messagesEl.scrollTop = messagesEl.scrollHeight;
     return typingEl;
   }
   // ── Tool execution ──
   async executeTool(toolName, toolInput, messagesEl) {
+    var _a;
     switch (toolName) {
       case "get_today_date": {
         const today = this.getLocalDateStr();
         const yesterday = this.getYesterdayDateStr();
         const currentHour = new Date().getHours();
-        const requestedDate = toolInput.date || today;
+        const rawDate = toolInput.date;
+        const requestedDate = rawDate === "yesterday" ? yesterday : rawDate || today;
         const isYesterday = requestedDate === yesterday;
         if (!this.activeGoalId) {
           return { result: `Today is ${today}. No active goal selected.` };
@@ -1239,11 +1470,35 @@ LATE-NIGHT NOTE: It's past midnight (${currentHour}:00). The user might want to 
             messagesEl.scrollTop = messagesEl.scrollHeight;
           }
         });
+        if (this.activeGoalId) {
+          const allMessages = this.manager.getTinkerMessages(this.activeGoalId);
+          const dayStart = new Date(dateStr + "T00:00:00").getTime();
+          const dayEnd = dayStart + 24 * 60 * 60 * 1e3;
+          const dayMessages = allMessages.filter((m) => m.timestamp >= dayStart && m.timestamp < dayEnd);
+          if (dayMessages.length > 0) {
+            const userMessages = dayMessages.filter((m) => m.role === "user");
+            const excerpts = [];
+            let totalLen = 0;
+            for (const msg of userMessages) {
+              const text = msg.content.slice(0, 500);
+              const line = `[User]: ${text}${msg.content.length > 500 ? "..." : ""}`;
+              if (totalLen + line.length > 4e3)
+                break;
+              excerpts.push(line);
+              totalLen += line.length;
+            }
+            if (excerpts.length > 0) {
+              signals.conversationContext = excerpts.join("\n");
+            }
+          }
+        }
         this.lastObservedSignals = signals;
         const priorityTasks = signals.tasks.filter((t) => t.priority);
         const priorityCompleted = priorityTasks.filter((t) => t.completed).length;
-        const priorityDeepWork = priorityTasks.filter((t) => t.effort === "deep_work").length;
-        const summary = `Observed for ${dateStr}: ${priorityTasks.length} priority actions (${priorityCompleted} completed, ${priorityDeepWork} deep work), ${signals.feedback.length} feedback, ${signals.reflections.length} reflections, ${signals.vaultActivity.filesModified} files modified`;
+        const shippedCount = signals.ships.filter((s) => s.completed).length;
+        const gitFileCount = ((_a = signals.vaultActivity.modifiedFiles) == null ? void 0 : _a.length) || 0;
+        const convCount = signals.conversationContext ? signals.conversationContext.split("\n").length : 0;
+        const summary = `Observed for ${dateStr}: ${priorityTasks.length} priority actions (${priorityCompleted} done), ${signals.ships.length} ship items (${shippedCount} shipped), ${gitFileCount} files changed (git diff), ${signals.feedback.length} feedback, ${signals.reflections.length} reflections, ${convCount} conversation messages`;
         this.completeToolStep(stepEl, summary);
         messagesEl.scrollTop = messagesEl.scrollHeight;
         return { result: summary };
@@ -1264,7 +1519,7 @@ LATE-NIGHT NOTE: It's past midnight (${currentHour}:00). The user might want to 
         const stepEl = this.renderToolStep(messagesEl, `Running assessment for "${goal.text.slice(0, 40)}${goal.text.length > 40 ? "..." : ""}"...`);
         const assessment = await this.agent.assessSignals(goal.id, dateStr, this.lastObservedSignals);
         this.completeToolStep(stepEl, `Score: ${assessment.overallScore}/100`);
-        await this.createCheckInNote(assessment, goal);
+        await this.createCheckInNote(assessment, goal, this.lastObservedSignals);
         this.renderCheckInLink(messagesEl, assessment, goal);
         messagesEl.scrollTop = messagesEl.scrollHeight;
         const result = `Goal "${goal.text.slice(0, 50)}": ${assessment.overallScore}/100 (Day ${assessment.dayNumber}). Drift: ${assessment.driftIndicators.join("; ") || "None"}. Momentum: ${assessment.momentumIndicators.join("; ") || "None"}.`;
@@ -1277,10 +1532,10 @@ LATE-NIGHT NOTE: It's past midnight (${currentHour}:00). The user might want to 
         if (!summary) {
           return { result: "Error: No summary content provided." };
         }
-        const folderPath = "NorthStar/check-ins";
+        const folderPath = "PromiseLand/check-ins";
         const activeGoalCtx = this.activeGoalId ? this.manager.getGoalContext(this.activeGoalId) : null;
-        const goalSuffix = activeGoalCtx && this.manager.getGoals().length > 1 ? ` (${activeGoalCtx.goal.id.slice(-6)})` : "";
-        const filePath = `${folderPath}/North Star Check-in \u2014 ${dateStr}${goalSuffix}.md`;
+        const goalSuffix = activeGoalCtx && this.manager.getGoals().length > 1 ? ` \u2014 ${activeGoalCtx.goal.text.slice(0, 40).replace(/[\\/:*?"<>|]/g, "").trim()}` : "";
+        const filePath = `${folderPath}/Promise Land Check-in \u2014 ${dateStr}${goalSuffix}.md`;
         const existingFile = this.app.vault.getAbstractFileByPath(filePath);
         if (existingFile && !overwrite) {
           const currentContent = await this.app.vault.read(existingFile);
@@ -1471,7 +1726,7 @@ ${fileContent}
     } catch (e) {
       typingEl.remove();
       const errorMsg = e instanceof Error ? e.message : "Unknown error";
-      const errorEl = messagesEl.createDiv({ cls: "acta-northstar-tinker-error" });
+      const errorEl = messagesEl.createDiv({ cls: "acta-promiseland-tinker-error" });
       errorEl.textContent = `Error: ${errorMsg}`;
     }
     messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -1525,12 +1780,12 @@ ${fileContent}
     for (let i = 0; i < this.mentionFilteredFiles.length; i++) {
       const file = this.mentionFilteredFiles[i];
       const item = this.mentionDropdownEl.createDiv({
-        cls: `acta-northstar-mention-item${i === 0 ? " is-selected" : ""}`
+        cls: `acta-promiseland-mention-item${i === 0 ? " is-selected" : ""}`
       });
-      item.createSpan({ cls: "acta-northstar-mention-name", text: file.basename });
+      item.createSpan({ cls: "acta-promiseland-mention-name", text: file.basename });
       const folder = file.path.substring(0, file.path.length - file.name.length - 1);
       if (folder) {
-        item.createSpan({ cls: "acta-northstar-mention-path", text: folder });
+        item.createSpan({ cls: "acta-promiseland-mention-path", text: folder });
       }
       item.addEventListener("click", (e) => {
         e.preventDefault();
@@ -1549,7 +1804,7 @@ ${fileContent}
   updateMentionSelection() {
     if (!this.mentionDropdownEl)
       return;
-    const items = this.mentionDropdownEl.querySelectorAll(".acta-northstar-mention-item");
+    const items = this.mentionDropdownEl.querySelectorAll(".acta-promiseland-mention-item");
     items.forEach((el, i) => {
       if (i === this.mentionSelectedIndex) {
         el.addClass("is-selected");
@@ -1593,9 +1848,9 @@ ${fileContent}
     this.fileChipsEl.style.display = "flex";
     for (let i = 0; i < this.referencedFiles.length; i++) {
       const file = this.referencedFiles[i];
-      const chip = this.fileChipsEl.createDiv({ cls: "acta-northstar-file-chip" });
+      const chip = this.fileChipsEl.createDiv({ cls: "acta-promiseland-file-chip" });
       chip.createSpan({ text: file.basename });
-      const removeBtn = chip.createSpan({ cls: "acta-northstar-file-chip-remove", text: "\xD7" });
+      const removeBtn = chip.createSpan({ cls: "acta-promiseland-file-chip-remove", text: "\xD7" });
       removeBtn.addEventListener("click", () => {
         this.referencedFiles.splice(i, 1);
         this.updateFileChips();
@@ -1615,17 +1870,11 @@ ${fileContent}
     let assessmentBlock = "No assessment yet.";
     if (latest) {
       const breakdownLines = latest.signalBreakdown.map(
-        (s) => `- ${this.formatCategoryName(s.category)}: ${Math.round(s.score)}/${Math.round(s.maxScore)} \u2014 ${s.reasoning}`
+        (s) => `- ${this.formatCategoryName(s.category)}: ${Math.round(s.score)}/${Math.round(s.maxScore)}`
       ).join("\n");
-      const driftLines = latest.driftIndicators.length > 0 ? latest.driftIndicators.map((d) => `- ${d}`).join("\n") : "- None";
-      const momentumLines = latest.momentumIndicators.length > 0 ? latest.momentumIndicators.map((m) => `- ${m}`).join("\n") : "- None";
       assessmentBlock = `Score: ${latest.overallScore}/100 (Day ${latest.dayNumber}, ${latest.date})
 Signal Breakdown:
-${breakdownLines}
-Drift:
-${driftLines}
-Momentum:
-${momentumLines}`;
+${breakdownLines}`;
     }
     const contextBlock = goal.context ? `
 Reference Context:
@@ -1636,7 +1885,7 @@ Day ${dayNumber} of ${goal.timeWindowDays} | Phase: ${goal.currentPhase} | ${day
 ${contextBlock}
 Latest Assessment:
 ${assessmentBlock}`;
-    return `You are Tinker, a goal-alignment coach embedded in North Star. This conversation is scoped to a single goal.
+    return `You are Tinker, a goal-alignment coach embedded in Promise Land. This conversation is scoped to a single goal.
 
 ## Your Role
 - Challenge assumptions, surface patterns, pressure-test decisions
@@ -1644,14 +1893,30 @@ ${assessmentBlock}`;
 - Push back when the user rationalizes drift
 - You are NOT a general-purpose assistant. Stay focused on the goal.
 
+## Coaching Philosophy: Deep Focus, Not Task Pile-On
+The user is a deep focus builder, NOT a parallel worker. Their best output comes from sustained, concentrated effort on ONE thing at a time (e.g. SofaGenius: 7 hours all-in, extremely high quality output).
+
+NEVER suggest multiple parallel workstreams in a single day. NEVER suggest jumping to a different task tomorrow when the current work is still in progress.
+
+The right move is almost always: **go deeper on what you're already doing.** If the user launched a training run today, tomorrow should be evaluating that run, iterating on it, improving it \u2014 NOT switching to writing a narrative or doing something else. Results and narrative come naturally from deep, sustained work. Suggest the next depth-step on the current workstream, not the next item on a task list.
+
+Bad: "Today you should work on MOE training, write the Terminal Bench narrative, and make an open source PR"
+Bad: "Today: all-in on MOE training. Tomorrow: Terminal Bench narrative. Day after: open source PR." (This is task-hopping disguised as sequencing)
+Good: "You launched the training run today. Tomorrow: check if the loss is converging, run inference on the first checkpoint, evaluate quality. Go deeper before moving on."
+
+Only suggest switching to a different workstream when the current one has reached a natural stopping point with solid results.
+
+If the user has a full-time job, be realistic about bandwidth. One meaningful deep-work session per day outside of work is already excellent.
+
 ## Tools Available
 When the user asks for a "check-in", "how am I doing", "run a cycle", or similar:
-1. First call get_today_date to get today's date and check if a check-in exists. If the user asks for a specific date (e.g. "check in for yesterday"), pass that date to get_today_date.
-2. Then call observe_signals with that date to collect data
-3. Then call run_assessment with that date to score alignment
-4. Then provide your commentary and coaching
+1. First call get_today_date \u2014 if the user says "yesterday", pass date="yesterday". If they say a specific date, pass that date. If they just say "check in", omit the date (defaults to today).
+2. The tool returns the resolved date (e.g. "2026-02-15"). Use THIS date for ALL subsequent tool calls.
+3. Call observe_signals with that EXACT date
+4. Call run_assessment with that EXACT date
+5. Provide your commentary and coaching
 
-IMPORTANT: Always call get_today_date first and pass its date to the other tools. This ensures consistent dates and proper updates. If a check-in already exists for that date, tell the user you're updating it.
+CRITICAL: When the user says "check in for yesterday", you MUST pass date="yesterday" to get_today_date. Do NOT use today's date. The returned date from get_today_date is the one you use for observe_signals and run_assessment. Never default to today when the user explicitly asked for a different date.
 
 ## Late & Retroactive Check-ins
 - If the user asks to check in for yesterday, or it's past midnight and they're reflecting on the day that just ended: ALLOW IT. Better late than never.
@@ -1675,15 +1940,26 @@ Do NOT call tools unless the conversation warrants it. For regular coaching ques
 ## Current Goal
 ${goalBlock}
 
-## Priority Actions (IMPORTANT)
-The system extracts tasks from the "Today's Priority Actions" section in the daily note. The assessment ONLY evaluates these priority tasks \u2014 not the full task board. When coaching and commenting on check-in results, focus exclusively on the priority actions. Do NOT mention the total task count or non-priority tasks. Only discuss how well the user executed on their chosen priority actions for the day.
+## Assessment Signals (IMPORTANT)
+The system collects evidence from vault activity (git diffs showing actual file changes), conversation context, and optionally priority actions and ship items. Assess based on ALL evidence. Do NOT penalize for missing priority actions or empty structured sections \u2014 some days people just work without planning.
 
 Deep work includes any sustained focused work: coding, reading papers, research, studying, designing, writing \u2014 not just "development". If a priority task has a time annotation (like @10PM-1AM), that's a deep work session.
+
+## After Check-ins: Tone and Approach
+When presenting check-in results:
+- **Lead with what was accomplished today.** Acknowledge the work before anything else.
+- **Do NOT lecture or moralize.** No "honest take" editorials, no "but you still need to..." piling on.
+- **Do NOT reference previous days' failures.** Each check-in is about TODAY. Don't bring up past missed days, past distractions, or "accumulated debt."
+- **Do NOT list all the things the user hasn't started yet.** They're sequencing tasks deliberately \u2014 one thing per day. Listing untouched workstreams feels like a guilt trip.
+- **Keep it short.** Score + what was done + one suggestion for going deeper on the current work. That's it. Do NOT suggest switching to a different task unless the current workstream has reached a clear stopping point.
+- **Help reflect:** Proactively offer 1-2 reflection points based on today's work, or ask "Anything you want to reflect on?" Make reflection easy, not punitive.
 
 ## What Tinker never does
 - No file/vault operations
 - No general Q&A unrelated to the goal
-- No flattery or empty encouragement`;
+- No flattery or empty encouragement
+- No lecturing, moralizing, or "honest take" sermons
+- No referencing past days' failures in today's check-in`;
   }
 };
 
@@ -1697,7 +1973,7 @@ var ActaTaskSettingTab = class extends import_obsidian6.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: "Northstar Settings" });
+    containerEl.createEl("h2", { text: "PromiseLand Settings" });
     containerEl.createEl("p", {
       text: "Tasks with inline hashtags (e.g. - [ ] #people do something) are automatically tracked on the board.",
       cls: "setting-item-description"
@@ -1742,8 +2018,8 @@ var ActaTaskSettingTab = class extends import_obsidian6.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    containerEl.createEl("h2", { text: "North Star" });
-    new import_obsidian6.Setting(containerEl).setName("Anthropic API key").setDesc("Required for North Star alignment assessments").addText(
+    containerEl.createEl("h2", { text: "Promise Land" });
+    new import_obsidian6.Setting(containerEl).setName("Anthropic API key").setDesc("Required for Promise Land alignment assessments").addText(
       (text) => text.setPlaceholder("sk-ant-...").setValue(this.plugin.settings.anthropicApiKey).then((t) => {
         t.inputEl.type = "password";
       }).onChange(async (value) => {
@@ -1752,8 +2028,8 @@ var ActaTaskSettingTab = class extends import_obsidian6.PluginSettingTab {
       })
     );
     new import_obsidian6.Setting(containerEl).setName("Model").setDesc("Claude model for assessments").addDropdown(
-      (dropdown) => dropdown.addOption("claude-sonnet-4-20250514", "Claude Sonnet 4").addOption("claude-haiku-4-5-20251001", "Claude Haiku 4.5").addOption("claude-opus-4-6", "Claude Opus 4.6").setValue(this.plugin.settings.northStarModel).onChange(async (value) => {
-        this.plugin.settings.northStarModel = value;
+      (dropdown) => dropdown.addOption("claude-sonnet-4-20250514", "Claude Sonnet 4").addOption("claude-haiku-4-5-20251001", "Claude Haiku 4.5").addOption("claude-opus-4-6", "Claude Opus 4.6").setValue(this.plugin.settings.promiseLandModel).onChange(async (value) => {
+        this.plugin.settings.promiseLandModel = value;
         await this.plugin.saveSettings();
       })
     );
@@ -2496,13 +2772,10 @@ var NegativeFeedbackScanner = class {
   }
 };
 
-// src/northStarTypes.ts
+// src/promiseLandTypes.ts
 var DEFAULT_SIGNAL_WEIGHTS = {
-  goalDirectDeepWork: 0.3,
-  taskCompletion: 0.15,
-  reflectionDepth: 0.25,
-  pipelineActivity: 0.2,
-  feedbackSignals: 0.1
+  build: 0.65,
+  ship: 0.35
 };
 var DEFAULT_POLICY = {
   signalWeights: { ...DEFAULT_SIGNAL_WEIGHTS },
@@ -2510,15 +2783,15 @@ var DEFAULT_POLICY = {
   milestones: [],
   version: 1
 };
-var DEFAULT_NORTHSTAR_DATA = {
+var DEFAULT_PROMISELAND_DATA = {
   goalContexts: [],
   archivedGoals: []
 };
 var TIME_ANNOTATION_REGEX = /@(\d{1,2}(?::?\d{2})?)\s*(?:AM|PM|am|pm)?\s*[-–]\s*(\d{1,2}(?::?\d{2})?)\s*(?:AM|PM|am|pm)?/;
 
-// src/northStarManager.ts
+// src/promiseLandManager.ts
 var MAX_GOALS = 2;
-var NorthStarManager = class {
+var PromiseLandManager = class {
   constructor(app, settings, data, saveData) {
     this.app = app;
     this.settings = settings;
@@ -2588,15 +2861,15 @@ var NorthStarManager = class {
       return null;
     return assessments[assessments.length - 1];
   }
-  getDayNumber(goalId) {
+  getDayNumber(goalId, forDate) {
     const ctx = this.getGoalContext(goalId);
     if (!ctx)
       return 0;
     const lockedDate = new Date(ctx.goal.lockedAt);
     lockedDate.setHours(0, 0, 0, 0);
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    const diffMs = now.getTime() - lockedDate.getTime();
+    const target = forDate ? new Date(forDate + "T00:00:00") : new Date();
+    target.setHours(0, 0, 0, 0);
+    const diffMs = target.getTime() - lockedDate.getTime();
     return Math.floor(diffMs / (1e3 * 60 * 60 * 24)) + 1;
   }
   getDaysLeft(goalId) {
@@ -2694,9 +2967,9 @@ var NorthStarManager = class {
   }
 };
 
-// src/northStarLlmClient.ts
+// src/promiseLandLlmClient.ts
 var import_obsidian11 = require("obsidian");
-var NorthStarLlmClient = class {
+var PromiseLandLlmClient = class {
   constructor(settings) {
     this.settings = settings;
   }
@@ -2706,7 +2979,7 @@ var NorthStarLlmClient = class {
   async chat(systemPrompt, messages) {
     const apiKey = this.settings.anthropicApiKey;
     if (!apiKey) {
-      throw new Error("Anthropic API key not set. Go to Settings \u2192 Northstar \u2192 North Star to add it.");
+      throw new Error("Anthropic API key not set. Go to Settings \u2192 PromiseLand to add it.");
     }
     let response;
     try {
@@ -2719,7 +2992,7 @@ var NorthStarLlmClient = class {
           "anthropic-version": "2023-06-01"
         },
         body: JSON.stringify({
-          model: this.settings.northStarModel,
+          model: this.settings.promiseLandModel,
           max_tokens: 4096,
           system: systemPrompt,
           messages: messages.map((m) => ({ role: m.role, content: m.content }))
@@ -2730,7 +3003,7 @@ var NorthStarLlmClient = class {
       throw new Error(`Network error: ${e instanceof Error ? e.message : String(e)}`);
     }
     if (response.status === 401) {
-      throw new Error("Invalid API key. Check your key in Settings \u2192 Northstar \u2192 North Star.");
+      throw new Error("Invalid API key. Check your key in Settings \u2192 PromiseLand.");
     }
     if (response.status !== 200) {
       throw new Error(`API error (${response.status}): ${response.text}`);
@@ -2744,7 +3017,7 @@ var NorthStarLlmClient = class {
   async chatWithTools(systemPrompt, messages, tools) {
     const apiKey = this.settings.anthropicApiKey;
     if (!apiKey) {
-      throw new Error("Anthropic API key not set. Go to Settings \u2192 Northstar \u2192 North Star to add it.");
+      throw new Error("Anthropic API key not set. Go to Settings \u2192 PromiseLand to add it.");
     }
     let response;
     try {
@@ -2757,7 +3030,7 @@ var NorthStarLlmClient = class {
           "anthropic-version": "2023-06-01"
         },
         body: JSON.stringify({
-          model: this.settings.northStarModel,
+          model: this.settings.promiseLandModel,
           max_tokens: 4096,
           system: systemPrompt,
           messages: messages.map((m) => ({ role: m.role, content: m.content })),
@@ -2769,7 +3042,7 @@ var NorthStarLlmClient = class {
       throw new Error(`Network error: ${e instanceof Error ? e.message : String(e)}`);
     }
     if (response.status === 401) {
-      throw new Error("Invalid API key. Check your key in Settings \u2192 Northstar \u2192 North Star.");
+      throw new Error("Invalid API key. Check your key in Settings \u2192 PromiseLand.");
     }
     if (response.status !== 200) {
       throw new Error(`API error (${response.status}): ${response.text}`);
@@ -2783,7 +3056,7 @@ var NorthStarLlmClient = class {
   async call(systemPrompt, userMessage) {
     const apiKey = this.settings.anthropicApiKey;
     if (!apiKey) {
-      throw new Error("Anthropic API key not set. Go to Settings \u2192 Northstar \u2192 North Star to add it.");
+      throw new Error("Anthropic API key not set. Go to Settings \u2192 PromiseLand to add it.");
     }
     let response;
     try {
@@ -2796,7 +3069,7 @@ var NorthStarLlmClient = class {
           "anthropic-version": "2023-06-01"
         },
         body: JSON.stringify({
-          model: this.settings.northStarModel,
+          model: this.settings.promiseLandModel,
           max_tokens: 4096,
           system: systemPrompt,
           messages: [{ role: "user", content: userMessage }]
@@ -2807,7 +3080,7 @@ var NorthStarLlmClient = class {
       throw new Error(`Network error: ${e instanceof Error ? e.message : String(e)}`);
     }
     if (response.status === 401) {
-      throw new Error("Invalid API key. Check your key in Settings \u2192 Northstar \u2192 North Star.");
+      throw new Error("Invalid API key. Check your key in Settings \u2192 PromiseLand.");
     }
     if (response.status !== 200) {
       throw new Error(`API error (${response.status}): ${response.text}`);
@@ -2820,8 +3093,10 @@ var NorthStarLlmClient = class {
   }
 };
 
-// src/northStarObserver.ts
-var NorthStarObserver = class {
+// src/promiseLandObserver.ts
+var import_obsidian12 = require("obsidian");
+var import_child_process = require("child_process");
+var PromiseLandObserver = class {
   constructor(app, settings, taskData, feedbackData, negativeFeedbackData) {
     this.app = app;
     this.settings = settings;
@@ -2838,11 +3113,18 @@ var NorthStarObserver = class {
     this.negativeFeedbackData = negativeFeedbackData;
   }
   async observe(dateStr, onStep) {
+    onStep == null ? void 0 : onStep("checkpoint", "Ensuring daily git checkpoint...");
+    this.ensureDailyCheckpoint(dateStr);
+    onStep == null ? void 0 : onStep("checkpoint", `Daily checkpoint ready`);
     onStep == null ? void 0 : onStep("tasks", "Scanning daily note for priority actions...");
     const tasks = await this.extractPriorityTasksFromNote(dateStr);
     const completedCount = tasks.filter((t) => t.completed).length;
     const deepWorkCount = tasks.filter((t) => t.effort === "deep_work").length;
     onStep == null ? void 0 : onStep("tasks", `Found ${tasks.length} priority actions (${completedCount} completed, ${deepWorkCount} deep work)`);
+    onStep == null ? void 0 : onStep("ships", "Scanning daily note for ships...");
+    const ships = await this.extractShipsFromNote(dateStr);
+    const shippedCount = ships.filter((s) => s.completed).length;
+    onStep == null ? void 0 : onStep("ships", `Found ${ships.length} ships (${shippedCount} shipped)`);
     onStep == null ? void 0 : onStep("positive-feedback", "Scanning positive feedback...");
     const positiveFeedback = this.extractPositiveFeedbackSignals(dateStr);
     onStep == null ? void 0 : onStep("positive-feedback", `Found ${positiveFeedback.length} positive feedback entries`);
@@ -2850,15 +3132,29 @@ var NorthStarObserver = class {
     const negativeFeedback = this.extractNegativeFeedbackSignals(dateStr);
     onStep == null ? void 0 : onStep("negative-feedback", `Found ${negativeFeedback.length} negative feedback entries`);
     const feedback = [...positiveFeedback, ...negativeFeedback];
-    onStep == null ? void 0 : onStep("reflections", "Scanning #northstar reflections...");
+    onStep == null ? void 0 : onStep("reflections", "Scanning #promiseland reflections...");
     const reflections = await this.extractReflections(dateStr);
     onStep == null ? void 0 : onStep("reflections", `Found ${reflections.length} reflections`);
     onStep == null ? void 0 : onStep("vault", "Checking vault activity...");
     const vaultActivity = this.getVaultActivity(dateStr);
-    onStep == null ? void 0 : onStep("vault", `${vaultActivity.filesModified} files across ${vaultActivity.foldersActive.length} folders`);
+    onStep == null ? void 0 : onStep("vault", `${vaultActivity.filesModified} files modified today across ${vaultActivity.foldersActive.length} folders`);
+    onStep == null ? void 0 : onStep("git-diff", `Scanning git diff for ${dateStr} changes...`);
+    let modifiedFiles = this.getModifiedFilesFromGit(dateStr);
+    if (modifiedFiles.length === 0 && vaultActivity.filesModified > 0) {
+      modifiedFiles = this.getModifiedFilesByMtime(dateStr);
+      const fileList = modifiedFiles.map((f) => `  \u2022 ${f.fileName}${f.createdToday ? " [NEW]" : ""}`).join("\n");
+      onStep == null ? void 0 : onStep("git-diff", `${modifiedFiles.length} files detected (mtime fallback):
+${fileList}`);
+    } else {
+      const fileList = modifiedFiles.map((f) => `  \u2022 ${f.fileName}${f.createdToday ? " [NEW]" : ""}`).join("\n");
+      onStep == null ? void 0 : onStep("git-diff", `${modifiedFiles.length} files changed (git diff):
+${fileList}`);
+    }
+    vaultActivity.modifiedFiles = modifiedFiles;
     return {
       date: dateStr,
       tasks,
+      ships,
       feedback,
       reflections,
       vaultActivity
@@ -2921,6 +3217,42 @@ var NorthStarObserver = class {
     }
     return signals;
   }
+  /**
+   * Read ships from the daily note's "Ships" section.
+   * Tracks what the user built/shipped/published today.
+   */
+  async extractShipsFromNote(dateStr) {
+    const ships = [];
+    const compactDate = dateStr.replace(/-/g, "");
+    const files = this.app.vault.getMarkdownFiles();
+    for (const file of files) {
+      if (!file.path.includes(compactDate))
+        continue;
+      const content = await this.app.vault.cachedRead(file);
+      const lines = content.split("\n");
+      let inShipsSection = false;
+      for (const line of lines) {
+        if (/^#{1,6}\s+Ships?/i.test(line)) {
+          inShipsSection = true;
+          continue;
+        }
+        if (inShipsSection && /^#{1,6}\s+/.test(line)) {
+          break;
+        }
+        if (inShipsSection) {
+          const checkboxMatch = line.match(/^\s*-\s+\[([ xX])\]\s+(.*)/i);
+          if (checkboxMatch) {
+            const completed = checkboxMatch[1].toLowerCase() === "x";
+            const title = checkboxMatch[2].replace(/#\w+/g, "").replace(/\[\[.*?\]\]/g, "").replace(/\[.*?\]\(.*?\)/g, "").replace(/\s+/g, " ").trim();
+            if (title.length > 0) {
+              ships.push({ title, completed });
+            }
+          }
+        }
+      }
+    }
+    return ships;
+  }
   parseDuration(startStr, endStr) {
     const startHour = this.parseHour(startStr);
     const endHour = this.parseHour(endStr);
@@ -2976,8 +3308,8 @@ var NorthStarObserver = class {
       const content = await this.app.vault.cachedRead(file);
       const lines = content.split("\n");
       for (const line of lines) {
-        if (line.toLowerCase().includes("#northstar")) {
-          const cleanText = line.replace(/^[\s]*[-*]\s+/, "").replace(/#northstar/gi, "").trim();
+        if (line.toLowerCase().includes("#promiseland")) {
+          const cleanText = line.replace(/^[\s]*[-*]\s+/, "").replace(/#promiseland/gi, "").trim();
           if (cleanText.length > 0) {
             reflections.push({
               text: cleanText,
@@ -3008,14 +3340,33 @@ var NorthStarObserver = class {
     }
     return reflections;
   }
+  /**
+   * Check if a file belongs to a given date via multiple signals:
+   * mtime, ctime, frontmatter date property, or filename pattern.
+   */
+  fileMatchesDate(file, dateStr, dayStart, dayEnd) {
+    var _a;
+    if (file.stat.mtime >= dayStart && file.stat.mtime < dayEnd)
+      return true;
+    if (file.stat.ctime >= dayStart && file.stat.ctime < dayEnd)
+      return true;
+    const compactDate = dateStr.replace(/-/g, "");
+    if (file.path.includes(compactDate))
+      return true;
+    const cache = this.app.metadataCache.getFileCache(file);
+    if (((_a = cache == null ? void 0 : cache.frontmatter) == null ? void 0 : _a.date) === dateStr)
+      return true;
+    return false;
+  }
   getVaultActivity(dateStr) {
     var _a;
-    const compactDate = dateStr.replace(/-/g, "");
     const files = this.app.vault.getMarkdownFiles();
     let filesModified = 0;
     const foldersSet = /* @__PURE__ */ new Set();
+    const dayStart = new Date(dateStr + "T00:00:00").getTime();
+    const dayEnd = dayStart + 24 * 60 * 60 * 1e3;
     for (const file of files) {
-      if (file.path.includes(compactDate)) {
+      if (this.fileMatchesDate(file, dateStr, dayStart, dayEnd)) {
         filesModified++;
         const folder = ((_a = file.parent) == null ? void 0 : _a.path) || "/";
         foldersSet.add(folder);
@@ -3026,10 +3377,221 @@ var NorthStarObserver = class {
       foldersActive: Array.from(foldersSet)
     };
   }
+  // ── Git helpers ──
+  getVaultRoot() {
+    return this.app.vault.adapter.basePath;
+  }
+  runGit(cmd) {
+    try {
+      return (0, import_child_process.execSync)(cmd, {
+        cwd: this.getVaultRoot(),
+        encoding: "utf-8",
+        timeout: 1e4
+      }).trim();
+    } catch (e) {
+      return "";
+    }
+  }
+  truncateDiff(diff, maxChars) {
+    if (diff.length <= maxChars)
+      return diff;
+    const truncated = diff.substring(0, maxChars);
+    const lastNewline = truncated.lastIndexOf("\n");
+    return (lastNewline > 0 ? truncated.substring(0, lastNewline) : truncated) + "\n... (truncated)";
+  }
+  /**
+   * Ensure a daily checkpoint commit exists. Returns the checkpoint commit hash.
+   * The checkpoint marks the start of the day — all diffs are measured from it.
+   */
+  ensureDailyCheckpoint(dateStr) {
+    const marker = `promiseland-checkpoint: ${dateStr}`;
+    const existing = this.runGit(`git log --format=%H --grep="${marker}" -1`);
+    if (existing)
+      return;
+    this.runGit("git add -A");
+    const status = this.runGit("git status --porcelain");
+    if (status) {
+      this.runGit(`git commit -m "${marker}"`);
+    } else {
+      this.runGit(`git commit --allow-empty -m "${marker}"`);
+    }
+  }
+  /**
+   * Find the baseline commit for a given date.
+   * Strategy:
+   * 1. If a checkpoint exists for dateStr, use it
+   * 2. Otherwise, find the last commit BEFORE that date (end of previous day)
+   * 3. Falls back to first commit if nothing else works
+   */
+  getBaselineCommit(dateStr) {
+    const beforeDate = this.runGit(`git log --format=%H --before="${dateStr}T00:00:00" -1`);
+    if (beforeDate)
+      return { hash: beforeDate, mode: "date-range" };
+    const marker = `promiseland-checkpoint: ${dateStr}`;
+    const checkpoint = this.runGit(`git log --format=%H --grep="${marker}" -1`);
+    if (checkpoint)
+      return { hash: checkpoint, mode: "checkpoint" };
+    const firstCommit = this.runGit("git rev-list --max-parents=0 HEAD");
+    if (firstCommit)
+      return { hash: firstCommit, mode: "fallback" };
+    return { hash: "HEAD", mode: "fallback" };
+  }
+  /**
+   * Find the end-of-day commit for a given date.
+   * Used for retroactive check-ins to cap the diff range.
+   */
+  getEndOfDayCommit(dateStr) {
+    const nextDay = new Date(dateStr + "T00:00:00");
+    nextDay.setDate(nextDay.getDate() + 1);
+    const nextDayStr = `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, "0")}-${String(nextDay.getDate()).padStart(2, "0")}`;
+    const endCommit = this.runGit(`git log --format=%H --before="${nextDayStr}T00:00:00" -1`);
+    return endCommit || "HEAD";
+  }
+  /**
+   * Get modified files for a specific date.
+   * Works for both today (checkpoint-based) and past dates (git log date range).
+   */
+  getModifiedFilesFromGit(dateStr) {
+    const results = [];
+    const excludedFolders = this.settings.excludedFolders || [];
+    const isToday = dateStr === this.getTodayStr();
+    const baseline = this.getBaselineCommit(dateStr);
+    let changedFilesRaw;
+    let diffRef;
+    const newFilesSet = /* @__PURE__ */ new Set();
+    if (isToday) {
+      const committedRaw = baseline.hash !== "HEAD" ? this.runGit(`git diff --name-only ${baseline.hash}..HEAD`) : "";
+      const uncommittedRaw = this.runGit("git diff --name-only HEAD");
+      const untrackedRaw = this.runGit("git ls-files --others --exclude-standard");
+      const committed = committedRaw.split("\n").filter(Boolean);
+      const uncommitted = uncommittedRaw.split("\n").filter(Boolean);
+      const untracked = untrackedRaw.split("\n").filter(Boolean);
+      const allFiles = [.../* @__PURE__ */ new Set([...committed, ...uncommitted, ...untracked])];
+      changedFilesRaw = allFiles.join("\n");
+      diffRef = baseline.hash;
+      if (baseline.hash !== "HEAD") {
+        const newRaw = this.runGit(`git diff --name-only --diff-filter=A ${baseline.hash}..HEAD`);
+        newRaw.split("\n").filter(Boolean).forEach((f) => newFilesSet.add(f));
+      }
+      untracked.forEach((f) => newFilesSet.add(f));
+    } else {
+      const endCommit = this.getEndOfDayCommit(dateStr);
+      const startCommit = baseline.hash;
+      if (startCommit === endCommit) {
+        return results;
+      }
+      changedFilesRaw = this.runGit(`git diff --name-only ${startCommit}..${endCommit}`);
+      diffRef = startCommit;
+      const newRaw = this.runGit(`git diff --name-only --diff-filter=A ${startCommit}..${endCommit}`);
+      newRaw.split("\n").filter(Boolean).forEach((f) => newFilesSet.add(f));
+    }
+    const allChangedFiles = changedFilesRaw.split("\n").filter(Boolean);
+    if (allChangedFiles.length === 0)
+      return results;
+    const mdFiles = allChangedFiles.filter((f) => f.endsWith(".md")).filter((f) => !excludedFolders.some((folder) => f.startsWith(folder + "/") || f === folder));
+    const endRef = isToday ? "" : this.getEndOfDayCommit(dateStr);
+    const withDiffs = [];
+    for (const filePath of mdFiles) {
+      let diff;
+      if (isToday && newFilesSet.has(filePath) && !this.runGit(`git diff ${diffRef} -- "${filePath}"`)) {
+        diff = this.runGit(`head -30 "${filePath}"`);
+        if (diff)
+          diff = `+++ new file
+${diff.split("\n").map((l) => `+${l}`).join("\n")}`;
+      } else if (isToday) {
+        diff = this.runGit(`git diff ${diffRef} -- "${filePath}"`);
+      } else {
+        diff = this.runGit(`git diff ${diffRef}..${endRef} -- "${filePath}"`);
+      }
+      withDiffs.push({ file: filePath, diff: diff || "", diffLen: (diff == null ? void 0 : diff.length) || 0 });
+    }
+    const meaningful = withDiffs.filter(({ file, diff }) => {
+      if (newFilesSet.has(file))
+        return true;
+      const contentLines = diff.split("\n").filter(
+        (l) => (l.startsWith("+") || l.startsWith("-")) && !l.startsWith("+++") && !l.startsWith("---") && l.trim().length > 1
+      );
+      return contentLines.length >= 3;
+    });
+    meaningful.sort((a, b) => b.diffLen - a.diffLen);
+    const capped = meaningful.slice(0, 15);
+    for (const { file: filePath, diff } of capped) {
+      const parts = filePath.split("/");
+      const fileName = parts[parts.length - 1];
+      const folder = parts.length > 1 ? parts.slice(0, -1).join("/") : "/";
+      const headings = [];
+      const tfile = this.app.vault.getAbstractFileByPath(filePath);
+      if (tfile && tfile instanceof import_obsidian12.TFile) {
+        const cache = this.app.metadataCache.getFileCache(tfile);
+        if (cache == null ? void 0 : cache.headings) {
+          for (const h of cache.headings) {
+            headings.push(h.heading);
+          }
+        }
+      }
+      results.push({
+        filePath,
+        fileName,
+        folder,
+        headings,
+        diff: this.truncateDiff(diff, 500),
+        createdToday: newFilesSet.has(filePath)
+      });
+    }
+    return results;
+  }
+  getTodayStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+  /**
+   * Fallback: detect modified files when git history is unavailable.
+   * Uses multiple signals: mtime, ctime, frontmatter date, filename pattern.
+   */
+  getModifiedFilesByMtime(dateStr) {
+    const results = [];
+    const excludedFolders = this.settings.excludedFolders || [];
+    const dayStart = new Date(dateStr + "T00:00:00").getTime();
+    const dayEnd = dayStart + 24 * 60 * 60 * 1e3;
+    const files = this.app.vault.getMarkdownFiles();
+    const modified = [];
+    for (const file of files) {
+      if (excludedFolders.some((folder) => file.path.startsWith(folder + "/") || file.path === folder))
+        continue;
+      if (this.fileMatchesDate(file, dateStr, dayStart, dayEnd)) {
+        const ctime = file.stat.ctime;
+        const isNew = ctime >= dayStart && ctime < dayEnd;
+        modified.push({ file, isNew });
+      }
+    }
+    modified.sort((a, b) => b.file.stat.mtime - a.file.stat.mtime);
+    const capped = modified.slice(0, 15);
+    for (const { file, isNew } of capped) {
+      const parts = file.path.split("/");
+      const fileName = parts[parts.length - 1];
+      const folder = parts.length > 1 ? parts.slice(0, -1).join("/") : "/";
+      const headings = [];
+      const cache = this.app.metadataCache.getFileCache(file);
+      if (cache == null ? void 0 : cache.headings) {
+        for (const h of cache.headings) {
+          headings.push(h.heading);
+        }
+      }
+      results.push({
+        filePath: file.path,
+        fileName,
+        folder,
+        headings,
+        diff: "(no git history available for this date)",
+        createdToday: isNew
+      });
+    }
+    return results;
+  }
 };
 
-// src/northStarAgent.ts
-var NorthStarAgent = class {
+// src/promiseLandAgent.ts
+var PromiseLandAgent = class {
   constructor(manager, observer, llmClient) {
     this.manager = manager;
     this.observer = observer;
@@ -3045,7 +3607,7 @@ var NorthStarAgent = class {
     const ctx = this.manager.getGoalContext(goalId);
     if (!ctx)
       throw new Error(`No goal context found for goalId: ${goalId}`);
-    const dayNumber = this.manager.getDayNumber(goalId);
+    const dayNumber = this.manager.getDayNumber(goalId, dateStr);
     const assessment = await this.assess(ctx.goal, signals, ctx.policy, dayNumber, dateStr);
     assessment.goalId = goalId;
     await this.manager.addAssessment(goalId, assessment);
@@ -3055,7 +3617,7 @@ var NorthStarAgent = class {
     const ctx = this.manager.getGoalContext(goalId);
     if (!ctx)
       throw new Error(`No goal context found for goalId: ${goalId}`);
-    const dayNumber = this.manager.getDayNumber(goalId);
+    const dayNumber = this.manager.getDayNumber(goalId, dateStr);
     const signals = await this.observer.observe(dateStr, (step, detail) => {
       const isRunning = detail.startsWith("Scanning") || detail.startsWith("Checking");
       onProgress == null ? void 0 : onProgress(step, isRunning ? "running" : "done", detail);
@@ -3076,46 +3638,80 @@ var NorthStarAgent = class {
     return this.parseAssessResponse(rawResponse, dateStr, dayNumber, signals, policy.version, goal.id);
   }
   buildAssessSystemPrompt() {
-    return `You are an alignment assessment agent for a personal goal-tracking system called North Star.
+    return `You are an alignment assessment agent for Promise Land.
 
-Your job: Given a user's locked goal, today's priority actions, and the current measurement policy (signal weights), produce a structured assessment of how aligned today's work was with the goal.
+The user's philosophy is **Build -> Ship, Repeat**. Score today's alignment on exactly 2 categories:
 
-IMPORTANT: You are ONLY evaluating the user's Priority Actions \u2014 these are the tasks they deliberately chose to focus on today. Ignore any other tasks. Judge completion and effort based solely on these priority actions.
+1. **build** \u2014 Did focused work, learning, or growth happen toward the goal? This includes: coding, designing, writing, deep thinking, debugging complex systems, figuring out new frameworks, reading papers, studying, strategic thinking, documenting insights, recording demos, preparing submissions. Building and learning are the same activity \u2014 any sustained effort or growth counts.
+2. **ship** \u2014 Did something get completed or reach a milestone? This includes: completing a training run, finishing an experiment, pushing code, deploying a product, submitting an entry, posting content, finishing a deliverable. Internal milestones count \u2014 shipping does NOT require external visibility. A completed training run IS a shipped artifact.
 
-You MUST respond with valid JSON only \u2014 no markdown, no explanation outside the JSON. The JSON must match this schema:
+## Evidence Sources
+
+You will receive:
+- PRIORITY ACTIONS \u2014 tasks the user set for today (may be empty)
+- SHIP ITEMS \u2014 things explicitly marked as shipped
+- VAULT ACTIVITY \u2014 git diffs showing file changes
+- CONVERSATION CONTEXT \u2014 excerpts from Tinker coaching chat. This is critical \u2014 it captures work outside the vault (demos, submissions, coding in other tools). Trust the conversation when vault signals are sparse.
+
+## Adaptive Weights
+
+Adapt weights based on the goal:
+- **Sprint goals** (hackathons, deadlines, 1-7 days): build 0.45, ship 0.55
+- **Learning goals** (interview prep, studying, research): build 0.75, ship 0.25
+- **Long-term goals** (products, research): build 0.65, ship 0.35
+
+## Rules
+- Priority actions and Ship sections are OPTIONAL organizational tools. Not setting them is a valid workflow choice \u2014 NEVER treat empty priority actions as drift, slipping discipline, or a negative signal. Assess based on what was actually done, not on process compliance.
+- Assess based on EVIDENCE OF WORK (vault diffs, conversation context, shipped artifacts) \u2014 not on whether the user followed a specific planning format.
+- **Deep focus philosophy:** The user is a deep focus builder who works best going all-in on ONE thing per day. If today's work shows deep, concentrated effort on a single workstream, that is EXCELLENT execution \u2014 do NOT list other untouched workstreams as drift. Only flag something as drift if it's been neglected for many days AND is time-critical. "Haven't started X yet" is not drift when the user is deliberately sequencing tasks.
+- Be specific \u2014 reference actual file names using [[filename]] wiki-link syntax (e.g. [[Final Submission]], [[SofaGenius - Talk Note]]). This makes the check-in note navigable.
+- Be honest and calibrated \u2014 don't inflate scores, but also don't deflate them. If the reasoning you write supports a high score, the numeric score MUST match. Do not write strong reasoning then give a low number.
+
+- **Scope: TODAY only.** Score based exclusively on what happened TODAY. Do NOT penalize today's score for what happened (or didn't happen) on previous days. Past missed days, past distractions, or accumulated debt from earlier days are irrelevant to today's score. Each day stands on its own. Drift indicators should only reference patterns visible IN TODAY'S signals \u2014 not historical complaints.
+
+You MUST respond with valid JSON only:
 
 {
   "overallScore": <number 0-100>,
   "signalBreakdown": [
     {
-      "category": "<string: goalDirectDeepWork | taskCompletion | reflectionDepth | pipelineActivity | feedbackSignals>",
-      "weight": <number: the weight from the policy>,
+      "category": "<string: build | ship>",
+      "weight": <number: adapted weight>,
       "score": <number: points earned>,
-      "maxScore": <number: max possible points for this category = weight * 100>,
-      "reasoning": "<string: 1-2 sentence explanation>"
+      "maxScore": <number: weight * 100>,
+      "reasoning": "<string: 2-4 bullet points, each starting with '- '. Be specific about what was done TODAY.>"
     }
   ],
-  "driftIndicators": ["<string: specific observation of misalignment>"],
-  "momentumIndicators": ["<string: specific observation of progress>"]
+  "driftIndicators": ["<string: specific misalignment observation FROM TODAY \u2014 never reference previous days>"],
+  "momentumIndicators": ["<string: specific progress observation FROM TODAY>"]
 }
 
-Rules:
-- overallScore = sum of all signalBreakdown scores
-- Each category's maxScore = weight * 100
-- Be specific in reasoning \u2014 reference actual task names, feedback entries, and reflections
-- Drift indicators should cite concrete evidence of misalignment
-- Momentum indicators should cite concrete evidence of progress
-- If signals are empty for a category, score it low but explain why
-- Be honest and calibrated \u2014 don't inflate scores
-- goalDirectDeepWork includes ANY sustained focused work toward the goal: coding, reading papers, research, studying, designing, writing, deep thinking sessions \u2014 not just "development" or "coding". Any task with a time annotation (e.g. @10PM-1AM) represents a focused work block and counts as deep work.
-- taskCompletion is based ONLY on the priority actions listed \u2014 how many were completed vs planned. Do NOT count non-priority tasks.`;
+overallScore = sum of all scores. Each maxScore = weight * 100.`;
   }
   buildAssessUserMessage(goal, signals, policy, dayNumber) {
     const priorityTasks = signals.tasks.filter((t) => t.priority);
+    const modifiedFiles = signals.vaultActivity.modifiedFiles || [];
     const contextSection = goal.context ? `
 ## Goal Context
 ${goal.context}
 ` : "";
+    let vaultActivitySection;
+    if (modifiedFiles.length > 0) {
+      const fileEntries = modifiedFiles.map((f) => {
+        const newTag = f.createdToday ? " [NEW]" : "";
+        const headingsLine = f.headings.length > 0 ? `  Headings: ${f.headings.join(" > ")}` : "";
+        const diffBlock = f.diff ? `  Changes:
+  \`\`\`diff
+  ${f.diff}
+  \`\`\`` : "  (no diff available)";
+        return `- **${f.fileName}** (${f.folder})${newTag}
+${headingsLine}
+${diffBlock}`;
+      }).join("\n\n");
+      vaultActivitySection = fileEntries;
+    } else {
+      vaultActivitySection = "No file changes detected via git diff.";
+    }
     return `## Locked Goal
 "${goal.text}"
 Time window: ${goal.timeWindowDays} days
@@ -3123,31 +3719,38 @@ Current phase: ${goal.currentPhase}
 Day: ${dayNumber} of ${goal.timeWindowDays}
 ${contextSection}
 ## Measurement Policy (v${policy.version})
-Signal weights:
-- goalDirectDeepWork: ${policy.signalWeights.goalDirectDeepWork}
-- taskCompletion: ${policy.signalWeights.taskCompletion}
-- reflectionDepth: ${policy.signalWeights.reflectionDepth}
-- pipelineActivity: ${policy.signalWeights.pipelineActivity}
-- feedbackSignals: ${policy.signalWeights.feedbackSignals}
+Default signal weights (adapt to goal type):
+- build: ${policy.signalWeights.build}
+- ship: ${policy.signalWeights.ship}
 
 ${policy.milestones.length > 0 ? `Milestones:
 ${policy.milestones.map((m) => `- ${m.text} (deadline: ${m.deadline}, completed: ${m.completed})`).join("\n")}` : "No milestones set yet."}
 
-## Today's Priority Actions (${priorityTasks.length} tasks \u2014 ONLY evaluate these)
+${priorityTasks.length > 0 ? `## Today's Priority Actions (${priorityTasks.length} tasks)
 
-${priorityTasks.length > 0 ? priorityTasks.map((t) => `- [${t.completed ? "x" : " "}] ${t.title} ${t.tags.join(" ")} | effort: ${t.effort}${t.timeAnnotation ? ` | time: ${t.timeAnnotation} (${t.durationMin}min)` : ""}`).join("\n") : "No priority actions set for today."}
+${priorityTasks.map((t) => `- [${t.completed ? "x" : " "}] ${t.title} ${t.tags.join(" ")} | effort: ${t.effort}${t.timeAnnotation ? ` | time: ${t.timeAnnotation} (${t.durationMin}min)` : ""}`).join("\n")}` : "## Today's Priority Actions\n\n(Not used today \u2014 assess based on other evidence below.)"}
+
+## Ship (${signals.ships.length} items)
+
+${signals.ships.length > 0 ? signals.ships.map((s) => `- [${s.completed ? "x" : " "}] ${s.title}`).join("\n") : "Nothing shipped today."}
+
+## Vault Activity \u2014 What Changed Today (${modifiedFiles.length} files)
+
+${vaultActivitySection}
 
 ### Feedback (${signals.feedback.length})
 ${signals.feedback.length > 0 ? signals.feedback.map((f) => `- [${f.type}] ${f.text} ${f.tags.join(" ")}`).join("\n") : "No feedback entries today."}
 
-### Reflections (${signals.reflections.length})
-${signals.reflections.length > 0 ? signals.reflections.map((r) => `- ${r.text}`).join("\n") : "No #northstar reflections today."}
+${signals.reflections.length > 0 ? `### Tagged Reflections (${signals.reflections.length})
+${signals.reflections.map((r) => `- ${r.text}`).join("\n")}` : ""}
 
-### Vault Activity
-- Files modified: ${signals.vaultActivity.filesModified}
-- Active folders: ${signals.vaultActivity.foldersActive.join(", ") || "none"}
+${signals.conversationContext ? `## Conversation Context \u2014 What the User Discussed Today
 
-Produce the assessment JSON now. Remember: taskCompletion is based ONLY on the ${priorityTasks.length} priority actions above.`;
+The following are excerpts from the user's Tinker coaching conversation on this day. This reveals work and thinking that may not be captured in the vault signals above.
+
+${signals.conversationContext}` : "## Conversation Context\nNo Tinker conversation recorded for this day."}
+
+Produce the assessment JSON now. Evaluate ALL evidence \u2014 vault activity diffs, conversation context, ship items, and any tagged reflections. Learning can appear in ANY document \u2014 look at the diffs for documented insights, decisions, progress notes, and learnings.`;
   }
   parseAssessResponse(raw, dateStr, dayNumber, signals, policyVersion, goalId) {
     let jsonStr = raw.trim();
@@ -3178,14 +3781,14 @@ Produce the assessment JSON now. Remember: taskCompletion is based ONLY on the $
 };
 
 // src/main.ts
-var ActaTaskPlugin = class extends import_obsidian12.Plugin {
+var ActaTaskPlugin = class extends import_obsidian13.Plugin {
   constructor() {
     super(...arguments);
     this.settings = DEFAULT_SETTINGS;
     this.data = DEFAULT_DATA;
     this.feedbackData = DEFAULT_FEEDBACK_DATA;
     this.negativeFeedbackData = DEFAULT_NEGATIVE_FEEDBACK_DATA;
-    this.northStarData = { ...DEFAULT_NORTHSTAR_DATA };
+    this.promiseLandData = { ...DEFAULT_PROMISELAND_DATA };
     this.taskManager = null;
     this.scanner = null;
     this.toggler = null;
@@ -3193,17 +3796,18 @@ var ActaTaskPlugin = class extends import_obsidian12.Plugin {
     this.feedbackScanner = null;
     this.negativeFeedbackManager = null;
     this.negativeFeedbackScanner = null;
-    this.northStarManager = null;
-    this.northStarLlmClient = null;
-    this.northStarObserver = null;
-    this.northStarAgent = null;
+    this.promiseLandManager = null;
+    this.promiseLandLlmClient = null;
+    this.promiseLandObserver = null;
+    this.promiseLandAgent = null;
+    this.autoCommitDebounced = null;
   }
   async onload() {
     await this.loadSettings();
     await this.loadTaskData();
     await this.loadFeedbackData();
     await this.loadNegativeFeedbackData();
-    await this.loadNorthStarData();
+    await this.loadPromiseLandData();
     this.taskManager = new TaskManager(
       this.app,
       this.settings,
@@ -3234,24 +3838,24 @@ var ActaTaskPlugin = class extends import_obsidian12.Plugin {
       this.negativeFeedbackManager,
       this.settings
     );
-    this.northStarManager = new NorthStarManager(
+    this.promiseLandManager = new PromiseLandManager(
       this.app,
       this.settings,
-      this.northStarData,
-      () => this.saveNorthStarData()
+      this.promiseLandData,
+      () => this.savePromiseLandData()
     );
-    this.northStarLlmClient = new NorthStarLlmClient(this.settings);
-    this.northStarObserver = new NorthStarObserver(
+    this.promiseLandLlmClient = new PromiseLandLlmClient(this.settings);
+    this.promiseLandObserver = new PromiseLandObserver(
       this.app,
       this.settings,
       this.data,
       this.feedbackData,
       this.negativeFeedbackData
     );
-    this.northStarAgent = new NorthStarAgent(
-      this.northStarManager,
-      this.northStarObserver,
-      this.northStarLlmClient
+    this.promiseLandAgent = new PromiseLandAgent(
+      this.promiseLandManager,
+      this.promiseLandObserver,
+      this.promiseLandLlmClient
     );
     this.registerView(ACTA_TASK_VIEW_TYPE, (leaf) => {
       return new TaskBoardView(
@@ -3278,25 +3882,25 @@ var ActaTaskPlugin = class extends import_obsidian12.Plugin {
         this.settings
       );
     });
-    this.registerView(ACTA_NORTHSTAR_VIEW_TYPE, (leaf) => {
-      return new NorthStarBoardView(
+    this.registerView(ACTA_PROMISELAND_VIEW_TYPE, (leaf) => {
+      return new PromiseLandBoardView(
         leaf,
-        this.northStarManager,
-        this.northStarAgent,
-        this.northStarLlmClient,
+        this.promiseLandManager,
+        this.promiseLandAgent,
+        this.promiseLandLlmClient,
         this.settings
       );
     });
-    this.addRibbonIcon("list-checks", "Open Northstar Board", () => {
+    this.addRibbonIcon("list-checks", "Open PromiseLand Board", () => {
       this.openBoard();
     });
     this.addCommand({
-      id: "open-northstar-board",
+      id: "open-promiseland-board",
       name: "Open task board",
       callback: () => this.openBoard()
     });
     this.addCommand({
-      id: "refresh-northstar-board",
+      id: "refresh-promiseland-board",
       name: "Refresh task board",
       callback: () => this.refreshBoard()
     });
@@ -3326,26 +3930,29 @@ var ActaTaskPlugin = class extends import_obsidian12.Plugin {
       name: "Refresh \u{1F612} \u8D1F\u53CD\u9988board",
       callback: () => this.refreshNegativeFeedbackBoard()
     });
-    this.addRibbonIcon("star", "Open North Star board", () => {
-      this.openNorthStarBoard();
+    this.addRibbonIcon("star", "Open Promise Land board", () => {
+      this.openPromiseLandBoard();
     });
     this.addCommand({
-      id: "open-acta-northstar-board",
-      name: "Open North Star board",
-      callback: () => this.openNorthStarBoard()
+      id: "open-acta-promiseland-board",
+      name: "Open Promise Land board",
+      callback: () => this.openPromiseLandBoard()
     });
     this.addCommand({
-      id: "refresh-acta-northstar-board",
-      name: "Refresh North Star board",
-      callback: () => this.refreshNorthStarBoard()
+      id: "refresh-acta-promiseland-board",
+      name: "Refresh Promise Land board",
+      callback: () => this.refreshPromiseLandBoard()
     });
     this.addSettingTab(new ActaTaskSettingTab(this.app, this));
+    this.setupAutoCommit();
+    this.setupDateStamping();
   }
   async onunload() {
     this.app.workspace.detachLeavesOfType(ACTA_TASK_VIEW_TYPE);
     this.app.workspace.detachLeavesOfType(ACTA_FEEDBACK_VIEW_TYPE);
     this.app.workspace.detachLeavesOfType(ACTA_NEGATIVE_FEEDBACK_VIEW_TYPE);
-    this.app.workspace.detachLeavesOfType(ACTA_NORTHSTAR_VIEW_TYPE);
+    this.app.workspace.detachLeavesOfType(ACTA_PROMISELAND_VIEW_TYPE);
+    this.runAutoCommitAndPush();
   }
   async loadSettings() {
     const data = await this.loadData();
@@ -3357,7 +3964,7 @@ var ActaTaskPlugin = class extends import_obsidian12.Plugin {
       tasks: this.data,
       feedback: this.feedbackData,
       negativeFeedback: this.negativeFeedbackData,
-      northStar: this.northStarData
+      promiseLand: this.promiseLandData
     });
     if (this.taskManager) {
       this.taskManager.updateSettings(this.settings);
@@ -3377,18 +3984,18 @@ var ActaTaskPlugin = class extends import_obsidian12.Plugin {
     if (this.negativeFeedbackScanner) {
       this.negativeFeedbackScanner.updateSettings(this.settings);
     }
-    if (this.northStarManager) {
-      this.northStarManager.updateSettings(this.settings);
+    if (this.promiseLandManager) {
+      this.promiseLandManager.updateSettings(this.settings);
     }
-    if (this.northStarLlmClient) {
-      this.northStarLlmClient.updateSettings(this.settings);
+    if (this.promiseLandLlmClient) {
+      this.promiseLandLlmClient.updateSettings(this.settings);
     }
-    if (this.northStarObserver) {
-      this.northStarObserver.updateSettings(this.settings);
+    if (this.promiseLandObserver) {
+      this.promiseLandObserver.updateSettings(this.settings);
     }
-    const northStarView = this.getActiveNorthStarView();
-    if (northStarView)
-      northStarView.updateSettings(this.settings);
+    const promiseLandView = this.getActivePromiseLandView();
+    if (promiseLandView)
+      promiseLandView.updateSettings(this.settings);
     const taskView = this.getActiveTaskView();
     if (taskView)
       taskView.updateSettings(this.settings);
@@ -3410,7 +4017,7 @@ var ActaTaskPlugin = class extends import_obsidian12.Plugin {
       tasks: this.data,
       feedback: this.feedbackData,
       negativeFeedback: this.negativeFeedbackData,
-      northStar: this.northStarData
+      promiseLand: this.promiseLandData
     });
   }
   async loadFeedbackData() {
@@ -3427,7 +4034,7 @@ var ActaTaskPlugin = class extends import_obsidian12.Plugin {
       tasks: this.data,
       feedback: this.feedbackData,
       negativeFeedback: this.negativeFeedbackData,
-      northStar: this.northStarData
+      promiseLand: this.promiseLandData
     });
   }
   async loadNegativeFeedbackData() {
@@ -3444,50 +4051,50 @@ var ActaTaskPlugin = class extends import_obsidian12.Plugin {
       tasks: this.data,
       feedback: this.feedbackData,
       negativeFeedback: this.negativeFeedbackData,
-      northStar: this.northStarData
+      promiseLand: this.promiseLandData
     });
   }
-  async loadNorthStarData() {
+  async loadPromiseLandData() {
     const data = await this.loadData();
-    const raw = data == null ? void 0 : data.northStar;
-    this.northStarData = Object.assign(
+    const raw = data == null ? void 0 : data.promiseLand;
+    this.promiseLandData = Object.assign(
       {},
-      DEFAULT_NORTHSTAR_DATA,
+      DEFAULT_PROMISELAND_DATA,
       raw
     );
-    if (!this.northStarData.archivedGoals) {
-      this.northStarData.archivedGoals = [];
+    if (!this.promiseLandData.archivedGoals) {
+      this.promiseLandData.archivedGoals = [];
     }
-    if (!this.northStarData.goalContexts) {
-      this.northStarData.goalContexts = [];
+    if (!this.promiseLandData.goalContexts) {
+      this.promiseLandData.goalContexts = [];
     }
     if ((raw == null ? void 0 : raw.goal) && !raw.goalContexts) {
       const legacyGoal = raw.goal;
-      const legacyPolicy = raw.policy || { ...DEFAULT_NORTHSTAR_DATA };
+      const legacyPolicy = raw.policy || { ...DEFAULT_PROMISELAND_DATA };
       const legacyAssessments = raw.assessments || [];
       for (const a of legacyAssessments) {
         if (!a.goalId) {
           a.goalId = legacyGoal.id;
         }
       }
-      this.northStarData.goalContexts = [{
+      this.promiseLandData.goalContexts = [{
         goal: legacyGoal,
         policy: legacyPolicy,
         assessments: legacyAssessments,
         tinkerMessages: []
       }];
-      delete this.northStarData.goal;
-      delete this.northStarData.policy;
-      delete this.northStarData.assessments;
+      delete this.promiseLandData.goal;
+      delete this.promiseLandData.policy;
+      delete this.promiseLandData.assessments;
     }
   }
-  async saveNorthStarData() {
+  async savePromiseLandData() {
     await this.saveData({
       settings: this.settings,
       tasks: this.data,
       feedback: this.feedbackData,
       negativeFeedback: this.negativeFeedbackData,
-      northStar: this.northStarData
+      promiseLand: this.promiseLandData
     });
   }
   getActiveTaskView() {
@@ -3581,23 +4188,23 @@ var ActaTaskPlugin = class extends import_obsidian12.Plugin {
       this.app.workspace.revealLeaf(leaf);
     }
   }
-  getActiveNorthStarView() {
+  getActivePromiseLandView() {
     const leaves = this.app.workspace.getLeavesOfType(
-      ACTA_NORTHSTAR_VIEW_TYPE
+      ACTA_PROMISELAND_VIEW_TYPE
     );
     if (leaves.length > 0) {
       return leaves[0].view;
     }
     return null;
   }
-  refreshNorthStarBoard() {
-    const view = this.getActiveNorthStarView();
+  refreshPromiseLandBoard() {
+    const view = this.getActivePromiseLandView();
     if (view)
       view.refresh();
   }
-  async openNorthStarBoard() {
+  async openPromiseLandBoard() {
     const existing = this.app.workspace.getLeavesOfType(
-      ACTA_NORTHSTAR_VIEW_TYPE
+      ACTA_PROMISELAND_VIEW_TYPE
     );
     if (existing.length > 0) {
       this.app.workspace.revealLeaf(existing[0]);
@@ -3606,10 +4213,127 @@ var ActaTaskPlugin = class extends import_obsidian12.Plugin {
     const leaf = this.app.workspace.getRightLeaf(false);
     if (leaf) {
       await leaf.setViewState({
-        type: ACTA_NORTHSTAR_VIEW_TYPE,
+        type: ACTA_PROMISELAND_VIEW_TYPE,
         active: true
       });
       this.app.workspace.revealLeaf(leaf);
+    }
+  }
+  // ── Auto-commit on file changes ──
+  getVaultRoot() {
+    return this.app.vault.adapter.basePath;
+  }
+  runGit(cmd) {
+    try {
+      return (0, import_child_process2.execSync)(cmd, {
+        cwd: this.getVaultRoot(),
+        encoding: "utf-8",
+        timeout: 15e3
+      }).trim();
+    } catch (e) {
+      return "";
+    }
+  }
+  setupAutoCommit() {
+    this.autoCommitDebounced = (0, import_obsidian13.debounce)(
+      () => this.runAutoCommitAndPush(),
+      60 * 1e3,
+      true
+      // reset timer on each call
+    );
+    this.registerEvent(
+      this.app.vault.on("modify", () => {
+        var _a;
+        return (_a = this.autoCommitDebounced) == null ? void 0 : _a.call(this);
+      })
+    );
+    this.registerEvent(
+      this.app.vault.on("create", () => {
+        var _a;
+        return (_a = this.autoCommitDebounced) == null ? void 0 : _a.call(this);
+      })
+    );
+    this.registerEvent(
+      this.app.vault.on("delete", () => {
+        var _a;
+        return (_a = this.autoCommitDebounced) == null ? void 0 : _a.call(this);
+      })
+    );
+    this.registerEvent(
+      this.app.vault.on("rename", () => {
+        var _a;
+        return (_a = this.autoCommitDebounced) == null ? void 0 : _a.call(this);
+      })
+    );
+  }
+  runAutoCommitAndPush() {
+    const status = this.runGit("git status --porcelain");
+    if (!status)
+      return;
+    const now = new Date();
+    const timestamp = now.toISOString().replace(/\.\d{3}Z$/, "");
+    this.runGit("git add -A");
+    this.runGit(`git commit -m "vault: auto-save ${timestamp}"`);
+    this.runGit("git push");
+  }
+  // ── Auto date-stamp new files ──
+  setupDateStamping() {
+    this.registerEvent(
+      this.app.vault.on("create", (file) => {
+        if (!(file instanceof import_obsidian13.TFile))
+          return;
+        if (!file.path.endsWith(".md"))
+          return;
+        if (file.path.startsWith(".obsidian/"))
+          return;
+        if (file.path.startsWith("PromiseLand/check-ins/"))
+          return;
+        setTimeout(() => this.stampDateProperty(file), 500);
+      })
+    );
+  }
+  async stampDateProperty(file) {
+    try {
+      const now = Date.now();
+      if (now - file.stat.ctime > 1e4)
+        return;
+      const content = await this.app.vault.read(file);
+      if (content.startsWith("---")) {
+        const endIdx = content.indexOf("---", 3);
+        if (endIdx > 0) {
+          const frontmatter = content.substring(3, endIdx);
+          if (/^date:/m.test(frontmatter))
+            return;
+        }
+      }
+      const nowDate = new Date();
+      const dateStr = `${nowDate.getFullYear()}-${String(nowDate.getMonth() + 1).padStart(2, "0")}-${String(nowDate.getDate()).padStart(2, "0")}`;
+      const timeStr = `${String(nowDate.getHours()).padStart(2, "0")}:${String(nowDate.getMinutes()).padStart(2, "0")}`;
+      let newContent;
+      if (content.startsWith("---")) {
+        const endIdx = content.indexOf("---", 3);
+        if (endIdx > 0) {
+          const frontmatter = content.substring(3, endIdx);
+          newContent = `---
+date: ${dateStr}
+time: ${timeStr}
+${frontmatter.trim() ? frontmatter.trimEnd() + "\n" : ""}---${content.substring(endIdx + 3)}`;
+        } else {
+          newContent = `---
+date: ${dateStr}
+time: ${timeStr}
+---
+${content}`;
+        }
+      } else {
+        newContent = `---
+date: ${dateStr}
+time: ${timeStr}
+---
+${content}`;
+      }
+      await this.app.vault.modify(file, newContent);
+    } catch (e) {
     }
   }
 };

@@ -1,12 +1,12 @@
 import { ItemView, WorkspaceLeaf, Notice, MarkdownRenderer, TFile } from "obsidian";
-import { ActaTaskSettings, ACTA_NORTHSTAR_VIEW_TYPE } from "./types";
-import { NorthStarManager } from "./northStarManager";
-import { NorthStarAgent } from "./northStarAgent";
-import { NorthStarLlmClient } from "./northStarLlmClient";
-import { NorthStarGoalModal, NorthStarEditContextModal } from "./northStarGoalModal";
+import { ActaTaskSettings, ACTA_PROMISELAND_VIEW_TYPE } from "./types";
+import { PromiseLandManager } from "./promiseLandManager";
+import { PromiseLandAgent } from "./promiseLandAgent";
+import { PromiseLandLlmClient } from "./promiseLandLlmClient";
+import { PromiseLandGoalModal, PromiseLandEditContextModal } from "./promiseLandGoalModal";
 import {
 	Assessment,
-	NorthStarGoal,
+	PromiseLandGoal,
 	TinkerMessage,
 	DaySignals,
 	ApiMessage,
@@ -14,20 +14,20 @@ import {
 	ToolDefinition,
 	ToolUseBlock,
 	TextBlock,
-} from "./northStarTypes";
+} from "./promiseLandTypes";
 
 // ── Tool definitions ──
 
 const TOOL_DEFINITIONS: ToolDefinition[] = [
 	{
 		name: "get_today_date",
-		description: "Get date info, day number for the current goal, and whether a check-in already exists. Always call this first before observe_signals or run_assessment. Pass a date to query a specific day (e.g. yesterday), or omit for today.",
+		description: "Get date info, day number for the current goal, and whether a check-in already exists. ALWAYS call this first before observe_signals or run_assessment. When the user says 'check in for yesterday', pass date='yesterday'. The returned date MUST be used for all subsequent tool calls.",
 		input_schema: {
 			type: "object",
 			properties: {
 				date: {
 					type: "string",
-					description: "Optional date in YYYY-MM-DD format. If omitted, returns today's date. Use this when the user wants to check in for a different day (e.g. yesterday).",
+					description: "Pass 'yesterday' when user asks for yesterday's check-in, or a YYYY-MM-DD date for a specific day. Omit for today.",
 				},
 			},
 			required: [],
@@ -99,10 +99,10 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
 	},
 ];
 
-export class NorthStarBoardView extends ItemView {
-	private manager: NorthStarManager;
-	private agent: NorthStarAgent;
-	private llmClient: NorthStarLlmClient;
+export class PromiseLandBoardView extends ItemView {
+	private manager: PromiseLandManager;
+	private agent: PromiseLandAgent;
+	private llmClient: PromiseLandLlmClient;
 	private settings: ActaTaskSettings;
 	private boardEl: HTMLDivElement | null = null;
 	private isSending = false;
@@ -121,9 +121,9 @@ export class NorthStarBoardView extends ItemView {
 
 	constructor(
 		leaf: WorkspaceLeaf,
-		manager: NorthStarManager,
-		agent: NorthStarAgent,
-		llmClient: NorthStarLlmClient,
+		manager: PromiseLandManager,
+		agent: PromiseLandAgent,
+		llmClient: PromiseLandLlmClient,
 		settings: ActaTaskSettings
 	) {
 		super(leaf);
@@ -134,11 +134,11 @@ export class NorthStarBoardView extends ItemView {
 	}
 
 	getViewType(): string {
-		return ACTA_NORTHSTAR_VIEW_TYPE;
+		return ACTA_PROMISELAND_VIEW_TYPE;
 	}
 
 	getDisplayText(): string {
-		return "North Star";
+		return "Promise Land";
 	}
 
 	getIcon(): string {
@@ -148,12 +148,12 @@ export class NorthStarBoardView extends ItemView {
 	async onOpen(): Promise<void> {
 		const container = this.containerEl.children[1];
 		container.empty();
-		container.addClass("northstar-container");
+		container.addClass("promiseland-container");
 
 		// Restore persisted active goal
 		this.activeGoalId = this.manager.getActiveGoalId();
 
-		this.boardEl = container.createDiv({ cls: "acta-northstar-board" });
+		this.boardEl = container.createDiv({ cls: "acta-promiseland-board" });
 		this.renderBoard();
 	}
 
@@ -209,15 +209,15 @@ export class NorthStarBoardView extends ItemView {
 	private renderHeader(): void {
 		if (!this.boardEl) return;
 
-		const header = this.boardEl.createDiv({ cls: "acta-northstar-header" });
-		const titleRow = header.createDiv({ cls: "acta-northstar-title-row" });
+		const header = this.boardEl.createDiv({ cls: "acta-promiseland-header" });
+		const titleRow = header.createDiv({ cls: "acta-promiseland-title-row" });
 
-		titleRow.createEl("h4", { text: "North Star" });
+		titleRow.createEl("h4", { text: "Promise Land" });
 
-		const btnGroup = titleRow.createDiv({ cls: "acta-northstar-btn-group" });
+		const btnGroup = titleRow.createDiv({ cls: "acta-promiseland-btn-group" });
 
 		const refreshBtn = btnGroup.createEl("button", {
-			cls: "acta-northstar-refresh-btn clickable-icon",
+			cls: "acta-promiseland-refresh-btn clickable-icon",
 			attr: { "aria-label": "Refresh" },
 		});
 		refreshBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`;
@@ -227,12 +227,12 @@ export class NorthStarBoardView extends ItemView {
 	private renderEmptyGoalState(): void {
 		if (!this.boardEl) return;
 
-		const empty = this.boardEl.createDiv({ cls: "acta-northstar-empty" });
+		const empty = this.boardEl.createDiv({ cls: "acta-promiseland-empty" });
 		empty.createEl("p", { text: "No goal set yet." });
 
 		const setBtn = empty.createEl("button", {
-			cls: "acta-northstar-set-goal-btn",
-			text: "Set Your North Star",
+			cls: "acta-promiseland-set-goal-btn",
+			text: "Set Your Promise Land",
 		});
 		setBtn.addEventListener("click", () => this.openGoalModal());
 	}
@@ -243,21 +243,21 @@ export class NorthStarBoardView extends ItemView {
 		this.renderBoard();
 	}
 
-	private renderGoalsSection(goals: NorthStarGoal[]): void {
+	private renderGoalsSection(goals: PromiseLandGoal[]): void {
 		if (!this.boardEl) return;
 
-		const section = this.boardEl.createDiv({ cls: "acta-northstar-goals-section" });
+		const section = this.boardEl.createDiv({ cls: "acta-promiseland-goals-section" });
 
 		const activeIndex = goals.findIndex(g => g.id === this.activeGoalId);
 		const currentIndex = activeIndex >= 0 ? activeIndex : 0;
 		const activeGoal = goals[currentIndex];
 
 		// Carousel wrapper: [<] [goal card] [>]
-		const carousel = section.createDiv({ cls: "acta-northstar-goal-carousel" });
+		const carousel = section.createDiv({ cls: "acta-promiseland-goal-carousel" });
 
 		// Left arrow
 		const leftArrow = carousel.createEl("button", {
-			cls: "acta-northstar-carousel-arrow",
+			cls: "acta-promiseland-carousel-arrow",
 			text: "\u2039",
 			attr: { "aria-label": "Previous goal" },
 		});
@@ -269,12 +269,12 @@ export class NorthStarBoardView extends ItemView {
 		});
 
 		// Single goal card (always rendered as active)
-		const cardWrapper = carousel.createDiv({ cls: "acta-northstar-carousel-card-wrapper" });
+		const cardWrapper = carousel.createDiv({ cls: "acta-promiseland-carousel-card-wrapper" });
 		this.renderGoalCard(cardWrapper, activeGoal);
 
 		// Right arrow
 		const rightArrow = carousel.createEl("button", {
-			cls: "acta-northstar-carousel-arrow",
+			cls: "acta-promiseland-carousel-arrow",
 			text: "\u203A",
 			attr: { "aria-label": "Next goal" },
 		});
@@ -287,10 +287,10 @@ export class NorthStarBoardView extends ItemView {
 
 		// Dot indicators (only if more than 1 goal)
 		if (goals.length > 1) {
-			const dots = section.createDiv({ cls: "acta-northstar-carousel-dots" });
+			const dots = section.createDiv({ cls: "acta-promiseland-carousel-dots" });
 			for (let i = 0; i < goals.length; i++) {
 				const dot = dots.createDiv({
-					cls: `acta-northstar-carousel-dot${i === currentIndex ? " is-active" : ""}`,
+					cls: `acta-promiseland-carousel-dot${i === currentIndex ? " is-active" : ""}`,
 				});
 				dot.addEventListener("click", () => {
 					if (i !== currentIndex && !this.isSending) {
@@ -302,16 +302,16 @@ export class NorthStarBoardView extends ItemView {
 
 		// Show "+" button when under the max
 		if (this.manager.canAddGoal()) {
-			const addBtn = section.createDiv({ cls: "acta-northstar-add-goal-btn" });
+			const addBtn = section.createDiv({ cls: "acta-promiseland-add-goal-btn" });
 			addBtn.textContent = "+";
 			addBtn.setAttribute("aria-label", "Add another goal");
 			addBtn.addEventListener("click", () => this.openGoalModal());
 		}
 	}
 
-	private renderGoalCard(parent: HTMLElement, goal: NorthStarGoal): void {
+	private renderGoalCard(parent: HTMLElement, goal: PromiseLandGoal): void {
 		const isActive = goal.id === this.activeGoalId;
-		const card = parent.createDiv({ cls: `acta-northstar-goal-card${isActive ? " is-active" : ""}` });
+		const card = parent.createDiv({ cls: `acta-promiseland-goal-card${isActive ? " is-active" : ""}` });
 
 		card.addEventListener("click", () => {
 			if (this.activeGoalId !== goal.id && !this.isSending) {
@@ -319,31 +319,40 @@ export class NorthStarBoardView extends ItemView {
 			}
 		});
 
-		const goalText = card.createDiv({ cls: "acta-northstar-goal-text" });
+		// Top row: complete button + goal text
+		const topRow = card.createDiv({ cls: "acta-promiseland-goal-top-row" });
+
+		const completeBtn = topRow.createEl("button", {
+			cls: "acta-promiseland-complete-btn clickable-icon",
+			attr: { "aria-label": "Mark goal as completed" },
+		});
+		completeBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>`;
+		completeBtn.addEventListener("click", (e) => {
+			e.stopPropagation();
+			this.completeGoal(goal);
+		});
+
+		const goalText = topRow.createDiv({ cls: "acta-promiseland-goal-text" });
 		goalText.createEl("span", { text: goal.text });
 
-		const badges = card.createDiv({ cls: "acta-northstar-goal-badges" });
+		// Badges row
+		const badges = card.createDiv({ cls: "acta-promiseland-goal-badges" });
 
 		const dayNum = this.manager.getDayNumber(goal.id);
 		badges.createEl("span", {
-			cls: "acta-northstar-badge",
+			cls: "acta-promiseland-badge",
 			text: `Day ${dayNum} of ${goal.timeWindowDays}`,
-		});
-
-		badges.createEl("span", {
-			cls: "acta-northstar-badge acta-northstar-badge-phase",
-			text: goal.currentPhase,
 		});
 
 		const daysLeft = this.manager.getDaysLeft(goal.id);
 		badges.createEl("span", {
-			cls: `acta-northstar-badge ${daysLeft <= 7 ? "acta-northstar-badge-urgent" : ""}`,
+			cls: `acta-promiseland-badge ${daysLeft <= 7 ? "acta-promiseland-badge-urgent" : ""}`,
 			text: `${daysLeft}d left`,
 		});
 
 		const contextLink = badges.createEl("span", {
-			cls: "acta-northstar-goal-context-link",
-			text: goal.context ? "edit context" : "+ Add context",
+			cls: "acta-promiseland-goal-context-link",
+			text: goal.context ? "edit context" : "+ context",
 			attr: { "aria-label": goal.context ? "Edit context" : "Add reference context" },
 		});
 		contextLink.addEventListener("click", (e) => {
@@ -352,27 +361,150 @@ export class NorthStarBoardView extends ItemView {
 		});
 	}
 
+	private async completeGoal(goal: PromiseLandGoal): Promise<void> {
+		const confirm = window.confirm(
+			`Mark "${goal.text}" as completed and archive it?\n\nThis will remove it from the active goals list. Assessment history is preserved.`
+		);
+		if (!confirm) return;
+
+		await this.manager.archiveGoal(goal.id);
+
+		// Celebration!
+		this.showCelebration(goal);
+
+		// Switch to another goal or clear
+		const remaining = this.manager.getGoals();
+		if (remaining.length > 0) {
+			this.activeGoalId = remaining[0].id;
+			this.manager.setActiveGoalId(remaining[0].id);
+		} else {
+			this.activeGoalId = null;
+		}
+
+		// Delay board re-render so celebration is visible
+		setTimeout(() => this.renderBoard(), 4000);
+	}
+
+	private showCelebration(goal: PromiseLandGoal): void {
+		// Full-screen confetti overlay
+		const overlay = document.body.createDiv({ cls: "promiseland-celebration-overlay" });
+
+		const content = overlay.createDiv({ cls: "promiseland-celebration-content" });
+		content.createEl("div", { cls: "promiseland-celebration-emoji", text: "\u2b50" });
+		content.createEl("div", { cls: "promiseland-celebration-title", text: "Goal Complete!" });
+		content.createEl("div", { cls: "promiseland-celebration-goal", text: goal.text });
+
+		const dayNum = this.manager.getDayNumber(goal.id);
+		content.createEl("div", {
+			cls: "promiseland-celebration-stats",
+			text: `${dayNum} days of focus. You shipped it.`,
+		});
+
+		// Spawn confetti particles
+		const colors = ["#f39c12", "#e74c3c", "#27ae60", "#3498db", "#9b59b6", "#e67e22", "#1abc9c"];
+		for (let i = 0; i < 80; i++) {
+			const particle = overlay.createDiv({ cls: "promiseland-confetti" });
+			const color = colors[Math.floor(Math.random() * colors.length)];
+			const left = Math.random() * 100;
+			const delay = Math.random() * 1.5;
+			const duration = 2 + Math.random() * 2;
+			const size = 6 + Math.random() * 8;
+			const rotation = Math.random() * 360;
+			particle.style.cssText = `
+				left: ${left}%;
+				background: ${color};
+				width: ${size}px;
+				height: ${size * 0.6}px;
+				animation-delay: ${delay}s;
+				animation-duration: ${duration}s;
+				transform: rotate(${rotation}deg);
+			`;
+		}
+
+		// Inject celebration styles if not already present
+		if (!document.getElementById("promiseland-celebration-styles")) {
+			const style = document.createElement("style");
+			style.id = "promiseland-celebration-styles";
+			style.textContent = `
+				.promiseland-celebration-overlay {
+					position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+					z-index: 10000; pointer-events: none;
+					display: flex; align-items: center; justify-content: center;
+					animation: promiseland-fade-in 0.3s ease-out;
+				}
+				.promiseland-celebration-content {
+					text-align: center; padding: 40px;
+					background: var(--background-primary);
+					border: 2px solid var(--text-accent);
+					border-radius: 16px;
+					box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+					pointer-events: auto;
+					animation: promiseland-pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+				}
+				.promiseland-celebration-emoji {
+					font-size: 64px; margin-bottom: 12px;
+					animation: promiseland-pulse 1s ease-in-out infinite;
+				}
+				.promiseland-celebration-title {
+					font-size: 28px; font-weight: 700;
+					color: var(--text-normal); margin-bottom: 8px;
+				}
+				.promiseland-celebration-goal {
+					font-size: 16px; color: var(--text-muted);
+					max-width: 400px; margin: 0 auto 12px;
+				}
+				.promiseland-celebration-stats {
+					font-size: 14px; color: var(--text-faint);
+				}
+				.promiseland-confetti {
+					position: fixed; top: -10px;
+					border-radius: 2px;
+					animation: promiseland-confetti-fall linear forwards;
+					pointer-events: none;
+				}
+				@keyframes promiseland-confetti-fall {
+					0% { top: -10px; opacity: 1; }
+					100% { top: 110vh; opacity: 0; transform: rotate(720deg) translateX(100px); }
+				}
+				@keyframes promiseland-pop-in {
+					0% { transform: scale(0.5); opacity: 0; }
+					100% { transform: scale(1); opacity: 1; }
+				}
+				@keyframes promiseland-pulse {
+					0%, 100% { transform: scale(1); }
+					50% { transform: scale(1.2); }
+				}
+				@keyframes promiseland-fade-in {
+					0% { opacity: 0; }
+					100% { opacity: 1; }
+				}
+			`;
+			document.head.appendChild(style);
+		}
+
+		// Auto-remove after 4 seconds
+		setTimeout(() => overlay.remove(), 4000);
+	}
+
 	private formatCategoryName(category: string): string {
 		const names: Record<string, string> = {
-			goalDirectDeepWork: "Focused Deep Work",
-			taskCompletion: "Task Completion",
-			reflectionDepth: "Reflection Depth",
-			pipelineActivity: "Pipeline Activity",
-			feedbackSignals: "Feedback Signals",
+			build: "Build + Learn",
+			ship: "Ship",
+			learn: "Build + Learn", // Legacy: learn is now merged into build
 		};
 		return names[category] || category;
 	}
 
 	private openGoalModal(): void {
-		new NorthStarGoalModal(this.app, async (text, days, context) => {
+		new PromiseLandGoalModal(this.app, async (text, days, context) => {
 			await this.manager.addGoal(text, days, context || undefined);
-			new Notice("North Star goal locked in!");
+			new Notice("Promise Land goal locked in!");
 			this.renderBoard();
 		}).open();
 	}
 
-	private openEditContextModal(goal: NorthStarGoal): void {
-		new NorthStarEditContextModal(this.app, goal.context || "", async (context) => {
+	private openEditContextModal(goal: PromiseLandGoal): void {
+		new PromiseLandEditContextModal(this.app, goal.context || "", async (context) => {
 			await this.manager.updateGoalContext(goal.id, context);
 			new Notice(context ? "Goal context updated!" : "Goal context cleared.");
 			this.renderBoard();
@@ -381,13 +513,13 @@ export class NorthStarBoardView extends ItemView {
 
 	// ── Check-in note creation ──
 
-	private async createCheckInNote(assessment: Assessment, goal: NorthStarGoal): Promise<void> {
-		const folderPath = "NorthStar/check-ins";
-		// Include a short goal ID suffix when multiple goals exist
+	private async createCheckInNote(assessment: Assessment, goal: PromiseLandGoal, signals?: DaySignals): Promise<void> {
+		const folderPath = "PromiseLand/check-ins";
+		// Include goal name in title when multiple goals exist
 		const goalSuffix = this.manager.getGoals().length > 1
-			? ` (${goal.id.slice(-6)})`
+			? ` — ${goal.text.slice(0, 40).replace(/[\\/:*?"<>|]/g, "").trim()}`
 			: "";
-		const filePath = `${folderPath}/North Star Check-in — ${assessment.date}${goalSuffix}.md`;
+		const filePath = `${folderPath}/Promise Land Check-in — ${assessment.date}${goalSuffix}.md`;
 
 		// Ensure folder exists
 		if (!this.app.vault.getAbstractFileByPath(folderPath)) {
@@ -399,50 +531,93 @@ export class NorthStarBoardView extends ItemView {
 
 		const buildBar = (pct: number) => {
 			const color = scoreColor(pct);
-			return `<div style="height:6px;background:#e0e0e0;border-radius:3px;overflow:hidden;margin:4px 0 6px 0"><div style="height:100%;width:${Math.min(100, Math.max(0, pct))}%;background:${color};border-radius:3px"></div></div>`;
+			return `<div style="height:8px;background:#e0e0e0;border-radius:4px;overflow:hidden;margin:6px 0 10px 0"><div style="height:100%;width:${Math.min(100, Math.max(0, pct))}%;background:${color};border-radius:4px"></div></div>`;
 		};
 
-		const overallPct = assessment.overallScore;
-		const overallColor = scoreColor(overallPct);
+		const overallColor = scoreColor(assessment.overallScore);
 
+		// Collect known file names for auto-linking
+		const knownFiles = (signals?.vaultActivity?.modifiedFiles || [])
+			.map(f => f.fileName.replace(/\.md$/, ""));
+		const autoLink = (text: string): string => {
+			let result = text;
+			for (const name of knownFiles) {
+				if (name.length < 4) continue; // Skip very short names
+				// Don't double-link if already [[linked]]
+				const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+				const regex = new RegExp(`(?<!\\[\\[)\\b${escaped}\\b(?!\\]\\])`, "gi");
+				result = result.replace(regex, `[[${name}]]`);
+			}
+			return result;
+		};
+
+		// Build breakdown with bars + bullet-pointed reasoning
 		const breakdownHtml = assessment.signalBreakdown.map(s => {
 			const pct = s.maxScore > 0 ? Math.round((s.score / s.maxScore) * 100) : 0;
-			return `<div style="margin-bottom:14px">
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px"><span style="font-weight:500;font-size:0.9em">${this.formatCategoryName(s.category)}</span><span style="font-size:0.85em;color:#888">${Math.round(s.score)}/${Math.round(s.maxScore)}</span></div>
+			// Ensure reasoning is bullet-pointed
+			let reasoning = s.reasoning.startsWith("- ")
+				? s.reasoning
+				: s.reasoning.split(". ").filter(Boolean).map(pt => `- ${pt.trim().replace(/\.$/, "")}`).join("\n");
+			reasoning = autoLink(reasoning);
+			return `### ${this.formatCategoryName(s.category)} — ${Math.round(s.score)}/${Math.round(s.maxScore)}
+
 ${buildBar(pct)}
-<div style="font-size:0.82em;color:#888;line-height:1.3">${s.reasoning}</div>
-</div>`;
-		}).join("\n");
 
-		const driftHtml = assessment.driftIndicators.length > 0
-			? assessment.driftIndicators.map(d => `<div style="border-left:2px solid #e74c3c;padding:6px 10px;margin-bottom:4px;font-size:0.9em;background:rgba(231,76,60,0.06);border-radius:0 4px 4px 0">${d}</div>`).join("\n")
-			: `<div style="font-size:0.9em;color:#888">None</div>`;
+${reasoning}`;
+		}).join("\n\n");
 
-		const momentumHtml = assessment.momentumIndicators.length > 0
-			? assessment.momentumIndicators.map(m => `<div style="border-left:2px solid #27ae60;padding:6px 10px;margin-bottom:4px;font-size:0.9em;background:rgba(39,174,96,0.06);border-radius:0 4px 4px 0">${m}</div>`).join("\n")
-			: `<div style="font-size:0.9em;color:#888">None</div>`;
+		const driftMd = assessment.driftIndicators.length > 0
+			? assessment.driftIndicators.map(d => `- ${autoLink(d)}`).join("\n")
+			: "None";
+
+		const momentumMd = assessment.momentumIndicators.length > 0
+			? assessment.momentumIndicators.map(m => `- ${autoLink(m)}`).join("\n")
+			: "None";
+
+		// Build Day Summary Table from ALL modified files (observer already filtered trivial ones)
+		let daySummaryMd = "";
+		const modifiedFiles = signals?.vaultActivity?.modifiedFiles || [];
+		if (modifiedFiles.length > 0) {
+			const categorize = (folder: string): string => {
+				if (folder.startsWith("Build")) return "Build";
+				if (folder.startsWith("Learn")) return "Learn";
+				if (folder.startsWith("Job Diary")) return "Job Diary";
+				if (folder.startsWith("2026") || folder.startsWith("2025") || folder.startsWith("2027")) return "Journal";
+				if (folder.startsWith("People")) return "People";
+				if (folder.startsWith("PromiseLand")) return "PromiseLand";
+				if (folder.startsWith("Projects")) return "Build";
+				return folder.split("/")[0] || "Root";
+			};
+			const rows = modifiedFiles.map(f => {
+				const category = categorize(f.folder);
+				const baseName = f.fileName.replace(/\.md$/, "");
+				const link = `[[${baseName}]]`;
+				const type = f.createdToday ? "New" : "Modified";
+				const description = f.headings.length > 0 ? f.headings.slice(0, 3).join(", ") : "";
+				return `| **${category}** | ${link} | ${type} | ${description} |`;
+			});
+			daySummaryMd = `### What Changed Today\n\n| Category | Item | Type | Description |\n| --- | --- | --- | --- |\n${rows.join("\n")}\n\n---\n`;
+		}
 
 		const content = `**Goal:** ${goal.text}
 **Day ${assessment.dayNumber} of ${goal.timeWindowDays}** | Phase: ${goal.currentPhase}
 
-<div style="text-align:center;padding:12px 0 4px 0">
-<span style="font-size:2.5em;font-weight:700;color:${overallColor}">${assessment.overallScore}</span><span style="font-size:1em;color:#888">/100</span>
-<div style="font-size:0.8em;color:#888;margin-top:4px">Day ${assessment.dayNumber} — ${assessment.date}</div>
-</div>
+---
 
-### Signal Breakdown
+${daySummaryMd}
+## <span style="color:${overallColor}">${assessment.overallScore}</span>/100
 
 ${breakdownHtml}
 
 ---
 
-### Drift Indicators
+### Drift
 
-${driftHtml}
+${driftMd}
 
-### Momentum Indicators
+### Momentum
 
-${momentumHtml}
+${momentumMd}
 `;
 
 		const existing = this.app.vault.getAbstractFileByPath(filePath);
@@ -453,28 +628,99 @@ ${momentumHtml}
 		}
 	}
 
+	// ── Day Summary Table ──
+
+	private async updateDaySummaryTable(dateStr: string, signals: DaySignals): Promise<void> {
+		const compactDate = dateStr.replace(/-/g, "");
+
+		// Find the daily note (Journal/YYYYMMDD.md)
+		const year = dateStr.slice(0, 4);
+		const dailyNotePath = `${year}/${compactDate}.md`;
+		const dailyNote = this.app.vault.getAbstractFileByPath(dailyNotePath);
+		if (!dailyNote || !(dailyNote instanceof TFile)) return;
+
+		const modifiedFiles = signals.vaultActivity.modifiedFiles || [];
+		if (modifiedFiles.length === 0) return;
+
+		// Categorize files by folder
+		const categorize = (folder: string): string => {
+			if (folder.startsWith("Build")) return "Build";
+			if (folder.startsWith("Learn")) return "Learn";
+			if (folder.startsWith("Job Diary")) return "Job Diary";
+			if (folder.startsWith("2026") || folder.startsWith("2025") || folder.startsWith("2027")) return "Journal";
+			if (folder.startsWith("People")) return "People";
+			if (folder.startsWith("PromiseLand")) return "PromiseLand";
+			if (folder.startsWith("Projects")) return "Build";
+			return folder.split("/")[0] || "Root";
+		};
+
+		// Build markdown table
+		const rows = modifiedFiles.map(f => {
+			const category = categorize(f.folder);
+			const baseName = f.fileName.replace(/\.md$/, "");
+			const link = `[[${baseName}]]`;
+			const type = f.createdToday ? "New" : "Modified";
+			const description = f.headings.length > 0
+				? f.headings.slice(0, 3).join(", ")
+				: "";
+			return `| **${category}** | ${link} | ${type} | ${description} |`;
+		});
+
+		const table = `| Category | Item | Type | Description |\n| --- | --- | --- | --- |\n${rows.join("\n")}`;
+
+		// Read daily note and replace Day Summary Table section
+		const content = await this.app.vault.read(dailyNote);
+		const lines = content.split("\n");
+		let sectionStart = -1;
+		let sectionEnd = -1;
+
+		for (let i = 0; i < lines.length; i++) {
+			if (/^#{1,6}\s+Day\s+Summary\s+Table/i.test(lines[i])) {
+				sectionStart = i;
+				// Find end: next heading or end of file
+				for (let j = i + 1; j < lines.length; j++) {
+					if (/^#{1,6}\s+/.test(lines[j])) {
+						sectionEnd = j;
+						break;
+					}
+				}
+				if (sectionEnd === -1) sectionEnd = lines.length;
+				break;
+			}
+		}
+
+		if (sectionStart === -1) return; // No Day Summary Table section found
+
+		// Replace section content (keep heading, replace everything until next heading)
+		const before = lines.slice(0, sectionStart + 1);
+		const after = lines.slice(sectionEnd);
+		const updated = [...before, "", table, "", ...after].join("\n");
+
+		await this.app.vault.modify(dailyNote, updated);
+	}
+
 	// ── Check-in note link (inline in chat) ──
 
-	private renderCheckInLink(parent: HTMLElement, assessment: Assessment, goal: NorthStarGoal): void {
+	private renderCheckInLink(parent: HTMLElement, assessment: Assessment, goal: PromiseLandGoal): void {
 		const goalSuffix = this.manager.getGoals().length > 1
-			? ` (${goal.id.slice(-6)})`
+			? ` — ${goal.text.slice(0, 40).replace(/[\\/:*?"<>|]/g, "").trim()}`
 			: "";
-		const notePath = `NorthStar/check-ins/North Star Check-in — ${assessment.date}${goalSuffix}.md`;
-		const link = parent.createDiv({ cls: "acta-northstar-checkin-link" });
+		const notePath = `PromiseLand/check-ins/Promise Land Check-in — ${assessment.date}${goalSuffix}.md`;
+		const link = parent.createDiv({ cls: "acta-promiseland-checkin-link" });
 
 		const scoreClass = assessment.overallScore >= 70
-			? "acta-northstar-score-good"
+			? "acta-promiseland-score-good"
 			: assessment.overallScore >= 40
-				? "acta-northstar-score-mid"
-				: "acta-northstar-score-low";
+				? "acta-promiseland-score-mid"
+				: "acta-promiseland-score-low";
 
-		link.createEl("span", { cls: `acta-northstar-checkin-score ${scoreClass}`, text: `${assessment.overallScore}/100` });
+		link.createEl("span", { cls: `acta-promiseland-checkin-score ${scoreClass}`, text: `${assessment.overallScore}/100` });
 
 		const goalLabel = this.manager.getGoals().length > 1
 			? ` — ${goal.text.slice(0, 30)}${goal.text.length > 30 ? "..." : ""}`
 			: "";
-		link.createEl("span", { cls: "acta-northstar-checkin-label", text: ` — Day ${assessment.dayNumber} Check-in${goalLabel}` });
-		link.createEl("span", { cls: "acta-northstar-checkin-open", text: "Open note \u2197" });
+		link.createEl("span", { cls: "acta-promiseland-checkin-label", text: ` — Day ${assessment.dayNumber} Check-in${goalLabel}` });
+		link.createEl("span", { cls: "acta-promiseland-checkin-open", text: "Open note \u2197" });
 
 		link.addEventListener("click", () => {
 			this.app.workspace.openLinkText(notePath, "", false);
@@ -486,10 +732,10 @@ ${momentumHtml}
 	private renderTinkerChat(): void {
 		if (!this.boardEl || !this.activeGoalId) return;
 
-		const container = this.boardEl.createDiv({ cls: "acta-northstar-tinker-container" });
+		const container = this.boardEl.createDiv({ cls: "acta-promiseland-tinker-container" });
 		container.createEl("h5", { text: "Tinker" });
 
-		const messagesEl = container.createDiv({ cls: "acta-northstar-tinker-messages" });
+		const messagesEl = container.createDiv({ cls: "acta-promiseland-tinker-messages" });
 		this.chatMessagesEl = messagesEl;
 
 		// Render existing messages for the active goal only
@@ -509,25 +755,25 @@ ${momentumHtml}
 		}
 
 		// Input container (Claudian-style bordered box)
-		const inputContainer = container.createDiv({ cls: "acta-northstar-input-container" });
-		const inputBox = inputContainer.createDiv({ cls: "acta-northstar-input-box" });
+		const inputContainer = container.createDiv({ cls: "acta-promiseland-input-container" });
+		const inputBox = inputContainer.createDiv({ cls: "acta-promiseland-input-box" });
 
 		const textarea = inputBox.createEl("textarea", {
-			cls: "acta-northstar-input",
+			cls: "acta-promiseland-input",
 			attr: { placeholder: "Ask Tinker about your goal... (@ to mention files)", rows: "3" },
 		});
 
 		// File chips container (between textarea and toolbar)
-		this.fileChipsEl = inputBox.createDiv({ cls: "acta-northstar-file-chips" });
+		this.fileChipsEl = inputBox.createDiv({ cls: "acta-promiseland-file-chips" });
 		this.referencedFiles = [];
 		this.updateFileChips();
 
 		// Mention dropdown (absolutely positioned above input box)
-		this.mentionDropdownEl = inputContainer.createDiv({ cls: "acta-northstar-mention-dropdown" });
+		this.mentionDropdownEl = inputContainer.createDiv({ cls: "acta-promiseland-mention-dropdown" });
 		this.mentionDropdownEl.style.display = "none";
 
 		// Toolbar inside the input box
-		const toolbar = inputBox.createDiv({ cls: "acta-northstar-input-toolbar" });
+		const toolbar = inputBox.createDiv({ cls: "acta-promiseland-input-toolbar" });
 
 		// Model selector (hover-based dropdown like Claudian)
 		const models: { value: string; label: string }[] = [
@@ -535,30 +781,30 @@ ${momentumHtml}
 			{ value: "claude-sonnet-4-20250514", label: "Sonnet" },
 			{ value: "claude-opus-4-6", label: "Opus" },
 		];
-		const currentModel = models.find(m => m.value === this.settings.northStarModel);
+		const currentModel = models.find(m => m.value === this.settings.promiseLandModel);
 
-		const modelSelector = toolbar.createDiv({ cls: "acta-northstar-model-selector" });
-		const modelBtn = modelSelector.createDiv({ cls: "acta-northstar-model-btn" });
+		const modelSelector = toolbar.createDiv({ cls: "acta-promiseland-model-selector" });
+		const modelBtn = modelSelector.createDiv({ cls: "acta-promiseland-model-btn" });
 		const modelLabel = modelBtn.createEl("span", { text: currentModel?.label || "Sonnet" });
-		modelBtn.createEl("span", { cls: "acta-northstar-model-chevron", text: "\u25B4" });
+		modelBtn.createEl("span", { cls: "acta-promiseland-model-chevron", text: "\u25B4" });
 
-		const dropdown = modelSelector.createDiv({ cls: "acta-northstar-model-dropdown" });
+		const dropdown = modelSelector.createDiv({ cls: "acta-promiseland-model-dropdown" });
 		for (const m of models) {
 			const option = dropdown.createDiv({
-				cls: `acta-northstar-model-option ${m.value === this.settings.northStarModel ? "is-selected" : ""}`,
+				cls: `acta-promiseland-model-option ${m.value === this.settings.promiseLandModel ? "is-selected" : ""}`,
 				text: m.label,
 			});
 			option.addEventListener("click", () => {
-				this.settings.northStarModel = m.value;
+				this.settings.promiseLandModel = m.value;
 				modelLabel.textContent = m.label;
-				dropdown.querySelectorAll(".acta-northstar-model-option").forEach(el => el.removeClass("is-selected"));
+				dropdown.querySelectorAll(".acta-promiseland-model-option").forEach(el => el.removeClass("is-selected"));
 				option.addClass("is-selected");
 			});
 		}
 
 		// Send button in toolbar (right side)
 		const sendBtn = toolbar.createEl("button", {
-			cls: "acta-northstar-send-btn",
+			cls: "acta-promiseland-send-btn",
 			attr: { "aria-label": "Send" },
 		});
 		sendBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`;
@@ -619,18 +865,18 @@ ${momentumHtml}
 
 	private appendMessageBubble(container: HTMLDivElement, msg: TinkerMessage): HTMLDivElement {
 		const bubble = container.createDiv({
-			cls: `acta-northstar-tinker-bubble acta-northstar-tinker-bubble-${msg.role}`,
+			cls: `acta-promiseland-tinker-bubble acta-promiseland-tinker-bubble-${msg.role}`,
 		});
 
 		// Show referenced file chips on user messages
 		if (msg.role === "user" && msg.referencedFiles && msg.referencedFiles.length > 0) {
-			const refsEl = bubble.createDiv({ cls: "acta-northstar-bubble-refs" });
+			const refsEl = bubble.createDiv({ cls: "acta-promiseland-bubble-refs" });
 			for (const ref of msg.referencedFiles) {
-				refsEl.createSpan({ cls: "acta-northstar-bubble-ref-chip", text: `@${ref.basename}` });
+				refsEl.createSpan({ cls: "acta-promiseland-bubble-ref-chip", text: `@${ref.basename}` });
 			}
 		}
 
-		const contentEl = bubble.createDiv({ cls: "acta-northstar-tinker-bubble-content" });
+		const contentEl = bubble.createDiv({ cls: "acta-promiseland-tinker-bubble-content" });
 		MarkdownRenderer.renderMarkdown(msg.content, contentEl, "", this);
 		return bubble;
 	}
@@ -638,41 +884,41 @@ ${momentumHtml}
 	// ── Tool step indicators ──
 
 	private renderToolStep(container: HTMLDivElement, label: string): HTMLDivElement {
-		const step = container.createDiv({ cls: "acta-northstar-tool-step" });
-		const indicator = step.createSpan({ cls: "acta-northstar-step-indicator" });
+		const step = container.createDiv({ cls: "acta-promiseland-tool-step" });
+		const indicator = step.createSpan({ cls: "acta-promiseland-step-indicator" });
 		indicator.textContent = "\u25CF"; // ●
-		step.createSpan({ cls: "acta-northstar-step-label", text: label });
-		step.addClass("acta-northstar-step-running");
+		step.createSpan({ cls: "acta-promiseland-step-label", text: label });
+		step.addClass("acta-promiseland-step-running");
 		container.scrollTop = container.scrollHeight;
 		return step;
 	}
 
 	private renderToolSubstep(parent: HTMLDivElement, text: string, status: "running" | "done"): HTMLDivElement {
-		const sub = parent.createDiv({ cls: "acta-northstar-tool-substep" });
-		const indicator = sub.createSpan({ cls: "acta-northstar-step-indicator" });
+		const sub = parent.createDiv({ cls: "acta-promiseland-tool-substep" });
+		const indicator = sub.createSpan({ cls: "acta-promiseland-step-indicator" });
 		indicator.textContent = status === "done" ? "\u2713" : "\u25CF"; // ✓ or ●
-		sub.createSpan({ cls: "acta-northstar-step-label", text });
-		sub.addClass(status === "done" ? "acta-northstar-step-done" : "acta-northstar-step-running");
+		sub.createSpan({ cls: "acta-promiseland-step-label", text });
+		sub.addClass(status === "done" ? "acta-promiseland-step-done" : "acta-promiseland-step-running");
 		return sub;
 	}
 
 	private completeToolStep(stepEl: HTMLDivElement, detail: string): void {
-		stepEl.removeClass("acta-northstar-step-running");
-		stepEl.addClass("acta-northstar-step-done");
-		const indicator = stepEl.querySelector(".acta-northstar-step-indicator");
+		stepEl.removeClass("acta-promiseland-step-running");
+		stepEl.addClass("acta-promiseland-step-done");
+		const indicator = stepEl.querySelector(".acta-promiseland-step-indicator");
 		if (indicator) indicator.textContent = "\u2713"; // ✓
 		if (detail) {
-			stepEl.createSpan({ cls: "acta-northstar-step-detail", text: ` — ${detail}` });
+			stepEl.createSpan({ cls: "acta-promiseland-step-detail", text: ` — ${detail}` });
 		}
 	}
 
 	// ── Typing indicator helpers ──
 
 	private addTypingIndicator(messagesEl: HTMLDivElement): HTMLDivElement {
-		const typingEl = messagesEl.createDiv({ cls: "acta-northstar-tinker-typing" });
-		typingEl.createSpan({ cls: "acta-northstar-tinker-dot" });
-		typingEl.createSpan({ cls: "acta-northstar-tinker-dot" });
-		typingEl.createSpan({ cls: "acta-northstar-tinker-dot" });
+		const typingEl = messagesEl.createDiv({ cls: "acta-promiseland-tinker-typing" });
+		typingEl.createSpan({ cls: "acta-promiseland-tinker-dot" });
+		typingEl.createSpan({ cls: "acta-promiseland-tinker-dot" });
+		typingEl.createSpan({ cls: "acta-promiseland-tinker-dot" });
 		messagesEl.scrollTop = messagesEl.scrollHeight;
 		return typingEl;
 	}
@@ -689,7 +935,9 @@ ${momentumHtml}
 				const today = this.getLocalDateStr();
 				const yesterday = this.getYesterdayDateStr();
 				const currentHour = new Date().getHours();
-				const requestedDate = (toolInput.date as string) || today;
+				// Accept "yesterday" as a shortcut
+				const rawDate = toolInput.date as string;
+				const requestedDate = rawDate === "yesterday" ? yesterday : (rawDate || today);
 				const isYesterday = requestedDate === yesterday;
 
 				if (!this.activeGoalId) {
@@ -735,11 +983,39 @@ ${momentumHtml}
 					}
 				});
 
+				// Attach Tinker conversation context for this date
+				if (this.activeGoalId) {
+					const allMessages = this.manager.getTinkerMessages(this.activeGoalId);
+					const dayStart = new Date(dateStr + "T00:00:00").getTime();
+					const dayEnd = dayStart + 24 * 60 * 60 * 1000;
+					const dayMessages = allMessages.filter(m => m.timestamp >= dayStart && m.timestamp < dayEnd);
+
+					if (dayMessages.length > 0) {
+						// Only include USER messages as evidence — Tinker's coaching responses
+						// contain task suggestions that the assessment wrongly treats as commitments
+						const userMessages = dayMessages.filter(m => m.role === "user");
+						const excerpts: string[] = [];
+						let totalLen = 0;
+						for (const msg of userMessages) {
+							const text = msg.content.slice(0, 500);
+							const line = `[User]: ${text}${msg.content.length > 500 ? "..." : ""}`;
+							if (totalLen + line.length > 4000) break;
+							excerpts.push(line);
+							totalLen += line.length;
+						}
+						if (excerpts.length > 0) {
+							signals.conversationContext = excerpts.join("\n");
+						}
+					}
+				}
+
 				this.lastObservedSignals = signals;
 				const priorityTasks = signals.tasks.filter(t => t.priority);
 				const priorityCompleted = priorityTasks.filter(t => t.completed).length;
-				const priorityDeepWork = priorityTasks.filter(t => t.effort === "deep_work").length;
-				const summary = `Observed for ${dateStr}: ${priorityTasks.length} priority actions (${priorityCompleted} completed, ${priorityDeepWork} deep work), ${signals.feedback.length} feedback, ${signals.reflections.length} reflections, ${signals.vaultActivity.filesModified} files modified`;
+				const shippedCount = signals.ships.filter(s => s.completed).length;
+				const gitFileCount = signals.vaultActivity.modifiedFiles?.length || 0;
+				const convCount = signals.conversationContext ? signals.conversationContext.split("\n").length : 0;
+				const summary = `Observed for ${dateStr}: ${priorityTasks.length} priority actions (${priorityCompleted} done), ${signals.ships.length} ship items (${shippedCount} shipped), ${gitFileCount} files changed (git diff), ${signals.feedback.length} feedback, ${signals.reflections.length} reflections, ${convCount} conversation messages`;
 				this.completeToolStep(stepEl, summary);
 				messagesEl.scrollTop = messagesEl.scrollHeight;
 				return { result: summary };
@@ -766,8 +1042,8 @@ ${momentumHtml}
 				const assessment = await this.agent.assessSignals(goal.id, dateStr, this.lastObservedSignals);
 				this.completeToolStep(stepEl, `Score: ${assessment.overallScore}/100`);
 
-				// Create/update check-in note and render link in chat
-				await this.createCheckInNote(assessment, goal);
+				// Create/update check-in note (with Day Summary Table) and render link
+				await this.createCheckInNote(assessment, goal, this.lastObservedSignals);
 				this.renderCheckInLink(messagesEl, assessment, goal);
 				messagesEl.scrollTop = messagesEl.scrollHeight;
 
@@ -787,12 +1063,12 @@ ${momentumHtml}
 					return { result: "Error: No summary content provided." };
 				}
 
-				const folderPath = "NorthStar/check-ins";
+				const folderPath = "PromiseLand/check-ins";
 				const activeGoalCtx = this.activeGoalId ? this.manager.getGoalContext(this.activeGoalId) : null;
 				const goalSuffix = activeGoalCtx && this.manager.getGoals().length > 1
-					? ` (${activeGoalCtx.goal.id.slice(-6)})`
+					? ` — ${activeGoalCtx.goal.text.slice(0, 40).replace(/[\\/:*?"<>|]/g, "").trim()}`
 					: "";
-				const filePath = `${folderPath}/North Star Check-in — ${dateStr}${goalSuffix}.md`;
+				const filePath = `${folderPath}/Promise Land Check-in — ${dateStr}${goalSuffix}.md`;
 				const existingFile = this.app.vault.getAbstractFileByPath(filePath);
 
 				// If existing Conversation Notes found and not a rewrite call, return old content for merging
@@ -1023,7 +1299,7 @@ ${momentumHtml}
 		} catch (e) {
 			typingEl.remove();
 			const errorMsg = e instanceof Error ? e.message : "Unknown error";
-			const errorEl = messagesEl.createDiv({ cls: "acta-northstar-tinker-error" });
+			const errorEl = messagesEl.createDiv({ cls: "acta-promiseland-tinker-error" });
 			errorEl.textContent = `Error: ${errorMsg}`;
 		}
 
@@ -1092,12 +1368,12 @@ ${momentumHtml}
 		for (let i = 0; i < this.mentionFilteredFiles.length; i++) {
 			const file = this.mentionFilteredFiles[i];
 			const item = this.mentionDropdownEl.createDiv({
-				cls: `acta-northstar-mention-item${i === 0 ? " is-selected" : ""}`,
+				cls: `acta-promiseland-mention-item${i === 0 ? " is-selected" : ""}`,
 			});
-			item.createSpan({ cls: "acta-northstar-mention-name", text: file.basename });
+			item.createSpan({ cls: "acta-promiseland-mention-name", text: file.basename });
 			const folder = file.path.substring(0, file.path.length - file.name.length - 1);
 			if (folder) {
-				item.createSpan({ cls: "acta-northstar-mention-path", text: folder });
+				item.createSpan({ cls: "acta-promiseland-mention-path", text: folder });
 			}
 			item.addEventListener("click", (e) => {
 				e.preventDefault();
@@ -1116,7 +1392,7 @@ ${momentumHtml}
 
 	private updateMentionSelection(): void {
 		if (!this.mentionDropdownEl) return;
-		const items = this.mentionDropdownEl.querySelectorAll(".acta-northstar-mention-item");
+		const items = this.mentionDropdownEl.querySelectorAll(".acta-promiseland-mention-item");
 		items.forEach((el, i) => {
 			if (i === this.mentionSelectedIndex) {
 				el.addClass("is-selected");
@@ -1167,9 +1443,9 @@ ${momentumHtml}
 		this.fileChipsEl.style.display = "flex";
 		for (let i = 0; i < this.referencedFiles.length; i++) {
 			const file = this.referencedFiles[i];
-			const chip = this.fileChipsEl.createDiv({ cls: "acta-northstar-file-chip" });
+			const chip = this.fileChipsEl.createDiv({ cls: "acta-promiseland-file-chip" });
 			chip.createSpan({ text: file.basename });
-			const removeBtn = chip.createSpan({ cls: "acta-northstar-file-chip-remove", text: "\u00d7" });
+			const removeBtn = chip.createSpan({ cls: "acta-promiseland-file-chip-remove", text: "\u00d7" });
 			removeBtn.addEventListener("click", () => {
 				this.referencedFiles.splice(i, 1);
 				this.updateFileChips();
@@ -1191,22 +1467,12 @@ ${momentumHtml}
 		let assessmentBlock = "No assessment yet.";
 		if (latest) {
 			const breakdownLines = latest.signalBreakdown.map(
-				s => `- ${this.formatCategoryName(s.category)}: ${Math.round(s.score)}/${Math.round(s.maxScore)} — ${s.reasoning}`
+				s => `- ${this.formatCategoryName(s.category)}: ${Math.round(s.score)}/${Math.round(s.maxScore)}`
 			).join("\n");
-			const driftLines = latest.driftIndicators.length > 0
-				? latest.driftIndicators.map(d => `- ${d}`).join("\n")
-				: "- None";
-			const momentumLines = latest.momentumIndicators.length > 0
-				? latest.momentumIndicators.map(m => `- ${m}`).join("\n")
-				: "- None";
 
 			assessmentBlock = `Score: ${latest.overallScore}/100 (Day ${latest.dayNumber}, ${latest.date})
 Signal Breakdown:
-${breakdownLines}
-Drift:
-${driftLines}
-Momentum:
-${momentumLines}`;
+${breakdownLines}`;
 		}
 
 		const contextBlock = goal.context
@@ -1219,7 +1485,7 @@ ${contextBlock}
 Latest Assessment:
 ${assessmentBlock}`;
 
-		return `You are Tinker, a goal-alignment coach embedded in North Star. This conversation is scoped to a single goal.
+		return `You are Tinker, a goal-alignment coach embedded in Promise Land. This conversation is scoped to a single goal.
 
 ## Your Role
 - Challenge assumptions, surface patterns, pressure-test decisions
@@ -1227,14 +1493,30 @@ ${assessmentBlock}`;
 - Push back when the user rationalizes drift
 - You are NOT a general-purpose assistant. Stay focused on the goal.
 
+## Coaching Philosophy: Deep Focus, Not Task Pile-On
+The user is a deep focus builder, NOT a parallel worker. Their best output comes from sustained, concentrated effort on ONE thing at a time (e.g. SofaGenius: 7 hours all-in, extremely high quality output).
+
+NEVER suggest multiple parallel workstreams in a single day. NEVER suggest jumping to a different task tomorrow when the current work is still in progress.
+
+The right move is almost always: **go deeper on what you're already doing.** If the user launched a training run today, tomorrow should be evaluating that run, iterating on it, improving it — NOT switching to writing a narrative or doing something else. Results and narrative come naturally from deep, sustained work. Suggest the next depth-step on the current workstream, not the next item on a task list.
+
+Bad: "Today you should work on MOE training, write the Terminal Bench narrative, and make an open source PR"
+Bad: "Today: all-in on MOE training. Tomorrow: Terminal Bench narrative. Day after: open source PR." (This is task-hopping disguised as sequencing)
+Good: "You launched the training run today. Tomorrow: check if the loss is converging, run inference on the first checkpoint, evaluate quality. Go deeper before moving on."
+
+Only suggest switching to a different workstream when the current one has reached a natural stopping point with solid results.
+
+If the user has a full-time job, be realistic about bandwidth. One meaningful deep-work session per day outside of work is already excellent.
+
 ## Tools Available
 When the user asks for a "check-in", "how am I doing", "run a cycle", or similar:
-1. First call get_today_date to get today's date and check if a check-in exists. If the user asks for a specific date (e.g. "check in for yesterday"), pass that date to get_today_date.
-2. Then call observe_signals with that date to collect data
-3. Then call run_assessment with that date to score alignment
-4. Then provide your commentary and coaching
+1. First call get_today_date — if the user says "yesterday", pass date="yesterday". If they say a specific date, pass that date. If they just say "check in", omit the date (defaults to today).
+2. The tool returns the resolved date (e.g. "2026-02-15"). Use THIS date for ALL subsequent tool calls.
+3. Call observe_signals with that EXACT date
+4. Call run_assessment with that EXACT date
+5. Provide your commentary and coaching
 
-IMPORTANT: Always call get_today_date first and pass its date to the other tools. This ensures consistent dates and proper updates. If a check-in already exists for that date, tell the user you're updating it.
+CRITICAL: When the user says "check in for yesterday", you MUST pass date="yesterday" to get_today_date. Do NOT use today's date. The returned date from get_today_date is the one you use for observe_signals and run_assessment. Never default to today when the user explicitly asked for a different date.
 
 ## Late & Retroactive Check-ins
 - If the user asks to check in for yesterday, or it's past midnight and they're reflecting on the day that just ended: ALLOW IT. Better late than never.
@@ -1258,14 +1540,25 @@ Do NOT call tools unless the conversation warrants it. For regular coaching ques
 ## Current Goal
 ${goalBlock}
 
-## Priority Actions (IMPORTANT)
-The system extracts tasks from the "Today's Priority Actions" section in the daily note. The assessment ONLY evaluates these priority tasks — not the full task board. When coaching and commenting on check-in results, focus exclusively on the priority actions. Do NOT mention the total task count or non-priority tasks. Only discuss how well the user executed on their chosen priority actions for the day.
+## Assessment Signals (IMPORTANT)
+The system collects evidence from vault activity (git diffs showing actual file changes), conversation context, and optionally priority actions and ship items. Assess based on ALL evidence. Do NOT penalize for missing priority actions or empty structured sections — some days people just work without planning.
 
 Deep work includes any sustained focused work: coding, reading papers, research, studying, designing, writing — not just "development". If a priority task has a time annotation (like @10PM-1AM), that's a deep work session.
+
+## After Check-ins: Tone and Approach
+When presenting check-in results:
+- **Lead with what was accomplished today.** Acknowledge the work before anything else.
+- **Do NOT lecture or moralize.** No "honest take" editorials, no "but you still need to..." piling on.
+- **Do NOT reference previous days' failures.** Each check-in is about TODAY. Don't bring up past missed days, past distractions, or "accumulated debt."
+- **Do NOT list all the things the user hasn't started yet.** They're sequencing tasks deliberately — one thing per day. Listing untouched workstreams feels like a guilt trip.
+- **Keep it short.** Score + what was done + one suggestion for going deeper on the current work. That's it. Do NOT suggest switching to a different task unless the current workstream has reached a clear stopping point.
+- **Help reflect:** Proactively offer 1-2 reflection points based on today's work, or ask "Anything you want to reflect on?" Make reflection easy, not punitive.
 
 ## What Tinker never does
 - No file/vault operations
 - No general Q&A unrelated to the goal
-- No flattery or empty encouragement`;
+- No flattery or empty encouragement
+- No lecturing, moralizing, or "honest take" sermons
+- No referencing past days' failures in today's check-in`;
 	}
 }

@@ -31,7 +31,7 @@ export class TaskBoardView extends ItemView {
 	}
 
 	getDisplayText(): string {
-		return "Northstar Board";
+		return "PromiseLand Board";
 	}
 
 	getIcon(): string {
@@ -41,9 +41,9 @@ export class TaskBoardView extends ItemView {
 	async onOpen(): Promise<void> {
 		const container = this.containerEl.children[1];
 		container.empty();
-		container.addClass("northstar-container");
+		container.addClass("promiseland-container");
 
-		this.boardEl = container.createDiv({ cls: "northstar-board" });
+		this.boardEl = container.createDiv({ cls: "promiseland-board" });
 
 		await this.refresh();
 		this.registerEvents();
@@ -88,12 +88,12 @@ export class TaskBoardView extends ItemView {
 		this.boardEl.empty();
 
 		// Header
-		const header = this.boardEl.createDiv({ cls: "northstar-header" });
-		const titleRow = header.createDiv({ cls: "northstar-title-row" });
+		const header = this.boardEl.createDiv({ cls: "promiseland-header" });
+		const titleRow = header.createDiv({ cls: "promiseland-title-row" });
 		titleRow.createEl("h4", { text: "Task Board" });
 
 		const refreshBtn = titleRow.createEl("button", {
-			cls: "northstar-refresh-btn clickable-icon",
+			cls: "promiseland-refresh-btn clickable-icon",
 			attr: { "aria-label": "Refresh" },
 		});
 		refreshBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`;
@@ -106,20 +106,20 @@ export class TaskBoardView extends ItemView {
 			0
 		);
 		header.createDiv({
-			cls: "northstar-stats",
+			cls: "promiseland-stats",
 			text: `${completedTasks}/${totalTasks} done across ${topics.length} topics`,
 		});
 
 		if (topics.length === 0) {
 			this.boardEl.createDiv({
-				cls: "northstar-empty",
+				cls: "promiseland-empty",
 				text: "No tasks yet. Add checkboxes with inline hashtags (e.g. - [ ] #people do something) to see them here.",
 			});
 			return;
 		}
 
 		// Topic sections
-		const list = this.boardEl.createDiv({ cls: "northstar-topics" });
+		const list = this.boardEl.createDiv({ cls: "promiseland-topics" });
 		for (const topic of topics) {
 			this.renderTopicSection(list, topic);
 		}
@@ -129,26 +129,26 @@ export class TaskBoardView extends ItemView {
 		parent: HTMLElement,
 		topic: TopicGroup
 	): void {
-		const section = parent.createDiv({ cls: "northstar-topic-section" });
+		const section = parent.createDiv({ cls: "promiseland-topic-section" });
 		const isCollapsed = this.collapsedTopics.has(topic.tag);
 
 		// Topic header
 		const topicHeader = section.createDiv({
-			cls: "northstar-topic-header",
+			cls: "promiseland-topic-header",
 		});
 
 		const chevron = topicHeader.createSpan({
-			cls: `northstar-chevron ${isCollapsed ? "is-collapsed" : ""}`,
+			cls: `promiseland-chevron ${isCollapsed ? "is-collapsed" : ""}`,
 		});
 		chevron.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
 
 		topicHeader.createSpan({
-			cls: "northstar-topic-tag",
+			cls: "promiseland-topic-tag",
 			text: `#${topic.displayTag}`,
 		});
 
 		topicHeader.createSpan({
-			cls: "northstar-topic-count",
+			cls: "promiseland-topic-count",
 			text: `${topic.completedCount}/${topic.totalCount}`,
 		});
 
@@ -163,7 +163,7 @@ export class TaskBoardView extends ItemView {
 
 		// Task list (hidden if collapsed)
 		if (!isCollapsed) {
-			const taskList = section.createDiv({ cls: "northstar-list" });
+			const taskList = section.createDiv({ cls: "promiseland-list" });
 
 			for (const task of topic.tasks) {
 				if (!this.settings.showCompleted && task.completed) continue;
@@ -177,12 +177,12 @@ export class TaskBoardView extends ItemView {
 		task: { id: string; text: string; completed: boolean; filePath: string; fileName: string; line: number; addedAt: number }
 	): void {
 		const item = parent.createDiv({
-			cls: `northstar-item ${task.completed ? "is-completed" : ""}`,
+			cls: `promiseland-item ${task.completed ? "is-completed" : ""}`,
 		});
 
 		const checkbox = item.createEl("input", {
 			type: "checkbox",
-			cls: "northstar-checkbox task-list-item-checkbox",
+			cls: "promiseland-checkbox task-list-item-checkbox",
 		});
 		(checkbox as HTMLInputElement).checked = task.completed;
 
@@ -190,23 +190,23 @@ export class TaskBoardView extends ItemView {
 			e.preventDefault();
 			const success = await this.toggler.toggleTask(task);
 			if (!success) {
-				console.error("Northstar: Failed to toggle task", task.id);
+				console.error("PromiseLand: Failed to toggle task", task.id);
 			}
 			// The vault.modify will trigger metadataCache changed → debounced refresh
 		});
 
 		item.createSpan({
-			cls: "northstar-text",
+			cls: "promiseland-text",
 			text: task.text,
 		});
 
 		if (this.settings.showSourceNote) {
 			const metaContainer = item.createSpan({
-				cls: "northstar-meta",
+				cls: "promiseland-meta",
 			});
 
 			const badge = metaContainer.createSpan({
-				cls: "northstar-source-badge",
+				cls: "promiseland-source-badge",
 				text: task.fileName,
 			});
 			badge.addEventListener("click", async (e) => {
@@ -228,14 +228,14 @@ export class TaskBoardView extends ItemView {
 				day: "numeric",
 			});
 			metaContainer.createSpan({
-				cls: "northstar-date-badge",
+				cls: "promiseland-date-badge",
 				text: dateStr,
 			});
 		}
 
 		// Remove button
 		const removeBtn = item.createSpan({
-			cls: "northstar-remove-btn",
+			cls: "promiseland-remove-btn",
 			text: "×",
 			attr: { title: "Remove from board" },
 		});

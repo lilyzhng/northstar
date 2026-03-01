@@ -1,6 +1,6 @@
-// North Star — All interfaces, constants, and defaults
+// Promise Land — All interfaces, constants, and defaults
 
-export interface NorthStarGoal {
+export interface PromiseLandGoal {
 	id: string;
 	text: string;
 	context?: string;
@@ -11,11 +11,9 @@ export interface NorthStarGoal {
 }
 
 export interface SignalWeights {
-	goalDirectDeepWork: number;
-	taskCompletion: number;
-	reflectionDepth: number;
-	pipelineActivity: number;
-	feedbackSignals: number;
+	build: number;
+	ship: number;
+	learn?: number; // Deprecated: merged into build
 }
 
 export interface Milestone {
@@ -28,7 +26,7 @@ export interface Milestone {
 	reason?: string;
 }
 
-export interface NorthStarPolicy {
+export interface PromiseLandPolicy {
 	signalWeights: SignalWeights;
 	checkInPrompts: string[];
 	milestones: Milestone[];
@@ -56,17 +54,34 @@ export interface ReflectionSignal {
 	filePath: string;
 }
 
+export interface ModifiedFileSignal {
+	filePath: string;
+	fileName: string;
+	folder: string;
+	headings: string[];
+	diff: string;           // git diff output for this file (truncated)
+	createdToday: boolean;  // new file (not in last commit)
+}
+
 export interface VaultActivity {
 	filesModified: number;
 	foldersActive: string[];
+	modifiedFiles?: ModifiedFileSignal[];
+}
+
+export interface ShipSignal {
+	title: string;
+	completed: boolean;
 }
 
 export interface DaySignals {
 	date: string;
 	tasks: TaskSignal[];
+	ships: ShipSignal[];
 	feedback: FeedbackSignal[];
 	reflections: ReflectionSignal[];
 	vaultActivity: VaultActivity;
+	conversationContext?: string; // Tinker conversation excerpts from this day
 }
 
 export interface SignalBreakdownItem {
@@ -91,8 +106,8 @@ export interface Assessment {
 }
 
 export interface GoalContext {
-	goal: NorthStarGoal;
-	policy: NorthStarPolicy;
+	goal: PromiseLandGoal;
+	policy: PromiseLandPolicy;
 	assessments: Assessment[];
 	tinkerMessages: TinkerMessage[];
 }
@@ -115,33 +130,30 @@ export interface TinkerMessage {
 	referencedFiles?: { path: string; basename: string }[];
 }
 
-export interface ActaNorthStarData {
+export interface ActaPromiseLandData {
 	goalContexts: GoalContext[];
-	archivedGoals: NorthStarGoal[];
+	archivedGoals: PromiseLandGoal[];
 	activeGoalId?: string | null;
 	tinkerMessages?: TinkerMessage[]; // Legacy: shared messages (migrated to per-goal)
 	// Legacy fields for migration (pre-multi-goal)
-	goal?: NorthStarGoal | null;
-	policy?: NorthStarPolicy;
+	goal?: PromiseLandGoal | null;
+	policy?: PromiseLandPolicy;
 	assessments?: Assessment[];
 }
 
 export const DEFAULT_SIGNAL_WEIGHTS: SignalWeights = {
-	goalDirectDeepWork: 0.30,
-	taskCompletion: 0.15,
-	reflectionDepth: 0.25,
-	pipelineActivity: 0.20,
-	feedbackSignals: 0.10,
+	build: 0.65,
+	ship: 0.35,
 };
 
-export const DEFAULT_POLICY: NorthStarPolicy = {
+export const DEFAULT_POLICY: PromiseLandPolicy = {
 	signalWeights: { ...DEFAULT_SIGNAL_WEIGHTS },
 	checkInPrompts: [],
 	milestones: [],
 	version: 1,
 };
 
-export const DEFAULT_NORTHSTAR_DATA: ActaNorthStarData = {
+export const DEFAULT_PROMISELAND_DATA: ActaPromiseLandData = {
 	goalContexts: [],
 	archivedGoals: [],
 };
